@@ -14,14 +14,18 @@ import {
   Loader2,
   Mic,
   X,
-  Terminal,
+  Sparkles,
   Lock,
   Cpu,
   Activity,
   Zap,
   Key,
   Globe,
-  Database
+  Database,
+  Moon,
+  Sun,
+  ChevronRight,
+  Terminal
 } from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -62,6 +66,7 @@ export default function ChatPage() {
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState("models");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // API Keys state
@@ -195,7 +200,6 @@ export default function ChatPage() {
   };
 
   const saveSettings = () => {
-    // Save to localStorage for now
     localStorage.setItem("closedpaw_settings", JSON.stringify({
       openaiKey,
       anthropicKey,
@@ -206,194 +210,225 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-cyan-50 font-mono">
+    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+      </div>
+
       {/* Sidebar */}
-      <div className="w-80 bg-slate-900 border-r border-cyan-900/50 flex flex-col">
+      <div className={`${sidebarCollapsed ? 'w-20' : 'w-80'} transition-all duration-300 bg-slate-900/50 backdrop-blur-xl border-r border-white/5 flex flex-col relative z-10`}>
         {/* Header */}
-        <div className="p-4 border-b border-cyan-900/50 bg-gradient-to-r from-cyan-950 to-slate-900">
+        <div className="p-4 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Shield className="w-8 h-8 text-cyan-400" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900 animate-pulse" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-cyan-400 tracking-wider">CLOSEDPAW</h1>
-              <p className="text-xs text-cyan-600">ZERO-TRUST AI v1.0</p>
-            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  CLOSEDPAW
+                </h1>
+                <p className="text-xs text-slate-500">Zero-Trust AI</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* System Status */}
-        <div className="p-4 border-b border-cyan-900/50">
-          <h2 className="text-xs font-bold text-cyan-500 mb-3 flex items-center gap-2">
-            <Activity className="w-4 h-4" />
-            SYSTEM STATUS
-          </h2>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${systemStatus?.ollama_connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-red-500"}`} />
-              <span className="text-cyan-300">
-                Ollama: {systemStatus?.ollama_connected ? "ONLINE" : "OFFLINE"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${systemStatus?.status === "running" ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-yellow-500"}`} />
-              <span className="text-cyan-300">
-                Core: {systemStatus?.status?.toUpperCase() || "UNKNOWN"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-cyan-500" />
-              <span className="text-cyan-300">
-                Security: ACTIVE
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Model Selection */}
-        <div className="p-4 border-b border-cyan-900/50">
-          <h2 className="text-xs font-bold text-cyan-500 mb-3 flex items-center gap-2">
-            <Cpu className="w-4 h-4" />
-            ACTIVE MODEL
-          </h2>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full p-2 bg-slate-800 border border-cyan-700 rounded text-cyan-300 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          >
-            {models.map((model) => (
-              <option key={model.name} value={model.name}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Pending Actions */}
-        {pendingActions.length > 0 && (
-          <div className="p-4 border-b border-cyan-900/50 flex-1 overflow-y-auto">
-            <h2 className="text-xs font-bold text-yellow-500 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              PENDING ACTIONS ({pendingActions.length})
-            </h2>
-            <div className="space-y-2">
-              {pendingActions.map((action) => (
-                <div
-                  key={action.id}
-                  className="p-3 bg-yellow-950/50 border border-yellow-700/50 rounded"
-                >
-                  <p className="text-sm text-yellow-300 font-bold">
-                    {action.action_type}
-                  </p>
-                  <p className="text-xs text-yellow-600">
-                    Level: {action.security_level}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => handleApproveAction(action.id, true)}
-                      className="flex-1 px-2 py-1 bg-green-900/50 border border-green-700 text-green-400 text-xs rounded hover:bg-green-800"
-                    >
-                      <CheckCircle className="w-3 h-3 inline mr-1" />
-                      APPROVE
-                    </button>
-                    <button
-                      onClick={() => handleApproveAction(action.id, false)}
-                      className="flex-1 px-2 py-1 bg-red-900/50 border border-red-700 text-red-400 text-xs rounded hover:bg-red-800"
-                    >
-                      <XCircle className="w-3 h-3 inline mr-1" />
-                      REJECT
-                    </button>
-                  </div>
+        {!sidebarCollapsed && (
+          <>
+            {/* System Status */}
+            <div className="p-4 border-b border-white/5">
+              <h2 className="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                <Activity className="w-3.5 h-3.5" />
+                System Status
+              </h2>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+                  <div className={`w-2 h-2 rounded-full ${systemStatus?.ollama_connected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-red-500"}`} />
+                  <span className="text-sm text-slate-300">Ollama</span>
+                  <span className={`ml-auto text-xs font-medium ${systemStatus?.ollama_connected ? "text-emerald-400" : "text-red-400"}`}>
+                    {systemStatus?.ollama_connected ? "ONLINE" : "OFFLINE"}
+                  </span>
                 </div>
-              ))}
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+                  <div className={`w-2 h-2 rounded-full ${systemStatus?.status === "running" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-yellow-500"}`} />
+                  <span className="text-sm text-slate-300">Core</span>
+                  <span className={`ml-auto text-xs font-medium ${systemStatus?.status === "running" ? "text-emerald-400" : "text-yellow-400"}`}>
+                    {systemStatus?.status?.toUpperCase() || "UNKNOWN"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+                  <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-sm text-slate-300">Security</span>
+                  <span className="ml-auto text-xs font-medium text-cyan-400">ACTIVE</span>
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* Model Selection */}
+            <div className="p-4 border-b border-white/5">
+              <h2 className="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                <Cpu className="w-3.5 h-3.5" />
+                Active Model
+              </h2>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full p-2.5 bg-slate-800/50 border border-white/10 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent backdrop-blur-sm appearance-none cursor-pointer"
+              >
+                {models.map((model) => (
+                  <option key={model.name} value={model.name} className="bg-slate-800">
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Pending Actions */}
+            {pendingActions.length > 0 && (
+              <div className="p-4 border-b border-white/5 flex-1 overflow-y-auto">
+                <h2 className="text-xs font-semibold text-amber-400 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Pending Actions ({pendingActions.length})
+                </h2>
+                <div className="space-y-2">
+                  {pendingActions.map((action) => (
+                    <div
+                      key={action.id}
+                      className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl backdrop-blur-sm"
+                    >
+                      <p className="text-sm text-amber-300 font-medium">
+                        {action.action_type}
+                      </p>
+                      <p className="text-xs text-amber-500/70 mt-1">
+                        Level: {action.security_level}
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleApproveAction(action.id, true)}
+                          className="flex-1 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors font-medium"
+                        >
+                          <CheckCircle className="w-3 h-3 inline mr-1" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleApproveAction(action.id, false)}
+                          className="flex-1 px-3 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors font-medium"
+                        >
+                          <XCircle className="w-3 h-3 inline mr-1" />
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Settings Button */}
+            <div className="p-4 mt-auto border-t border-white/5">
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group"
+              >
+                <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+                <span>Configuration</span>
+              </button>
+            </div>
+          </>
         )}
 
-        {/* Settings Button */}
-        <div className="p-4 mt-auto border-t border-cyan-900/50">
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            CONFIGURATION
-          </button>
-        </div>
+        {/* Collapse button */}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800 border border-white/10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors z-20"
+        >
+          <ChevronRight className={`w-4 h-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-slate-950">
+      <div className="flex-1 flex flex-col relative z-10">
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full">
-              <div className="relative mb-6">
-                <Terminal className="w-20 h-20 text-cyan-600" />
-                <div className="absolute inset-0 bg-cyan-500/20 blur-xl" />
+              <div className="relative mb-8">
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-500 flex items-center justify-center shadow-2xl shadow-cyan-500/25">
+                  <Sparkles className="w-12 h-12 text-white" />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-2xl blur-2xl opacity-50 animate-pulse" />
               </div>
-              <h2 className="text-2xl font-bold text-cyan-400 mb-2 tracking-wider">CLOSEDPAW</h2>
-              <p className="text-center max-w-md text-cyan-600">
+              
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-3">
+                Welcome to ClosedPaw
+              </h2>
+              <p className="text-center max-w-md text-slate-400 mb-8">
                 Zero-trust architecture with hardened sandboxing.
                 <br />
-                All actions require explicit approval.
+                Your AI assistant that never compromises on security.
               </p>
-              <div className="flex gap-4 mt-6">
-                <div className="flex items-center gap-2 text-xs text-cyan-700">
-                  <Shield className="w-4 h-4" />
-                  gVisor Sandbox
-                </div>
-                <div className="flex items-center gap-2 text-xs text-cyan-700">
-                  <Lock className="w-4 h-4" />
-                  Encrypted Storage
-                </div>
-                <div className="flex items-center gap-2 text-xs text-cyan-700">
-                  <Zap className="w-4 h-4" />
-                  Local Only
-                </div>
+              
+              <div className="flex flex-wrap gap-3 justify-center">
+                {[
+                  { icon: Shield, text: "gVisor Sandbox" },
+                  { icon: Lock, text: "Encrypted Storage" },
+                  { icon: Zap, text: "Local Only" },
+                  { icon: Terminal, text: "CLI Access" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-white/5 rounded-full text-sm text-slate-400 backdrop-blur-sm">
+                    <item.icon className="w-4 h-4 text-cyan-400" />
+                    {item.text}
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
             messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-3 ${
+                className={`flex gap-4 ${
                   message.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 {message.role === "assistant" && (
-                  <div className="w-10 h-10 rounded bg-cyan-900/50 border border-cyan-700 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-6 h-6 text-cyan-400" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/20">
+                    <Bot className="w-5 h-5 text-white" />
                   </div>
                 )}
                 
                 <div
-                  className={`max-w-[70%] rounded-lg px-4 py-3 border ${
+                  className={`max-w-[70%] rounded-2xl px-5 py-3.5 backdrop-blur-sm ${
                     message.role === "user"
-                      ? "bg-cyan-900/30 border-cyan-700 text-cyan-100"
-                      : "bg-slate-900 border-cyan-800/50 text-cyan-100"
+                      ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 text-white"
+                      : "bg-slate-800/50 border border-white/5 text-slate-200"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                   
                   {message.role === "assistant" && message.model && (
-                    <p className="text-xs text-cyan-600 mt-2">
+                    <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-white/5">
                       Model: {message.model}
                     </p>
                   )}
                   
                   {message.status === "pending" && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-cyan-600" />
-                      <span className="text-xs text-cyan-600">Processing...</span>
+                    <div className="flex items-center gap-2 mt-2 text-cyan-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-xs">Processing...</span>
                     </div>
                   )}
                 </div>
                 
                 {message.role === "user" && (
-                  <div className="w-10 h-10 rounded bg-cyan-700/50 border border-cyan-600 flex items-center justify-center flex-shrink-0">
-                    <User className="w-6 h-6 text-cyan-300" />
+                  <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-slate-300" />
                   </div>
                 )}
               </div>
@@ -403,79 +438,94 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-cyan-900/50 bg-slate-900/50">
-          <div className="flex gap-2">
-            <button
-              className="p-3 text-cyan-600 hover:text-cyan-400 rounded-lg border border-cyan-800/50 hover:border-cyan-600 transition-colors"
-              title="Voice input"
-            >
-              <Mic className="w-5 h-5" />
-            </button>
-            
-            <div className="flex-1 relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter command..."
-                className="w-full p-3 pr-12 bg-slate-900 border border-cyan-800/50 rounded-lg resize-none focus:ring-2 focus:ring-cyan-600 focus:border-transparent text-cyan-100 placeholder-cyan-800"
-                rows={1}
-                style={{ minHeight: "48px", maxHeight: "120px" }}
-              />
+        <div className="p-6 border-t border-white/5 bg-slate-900/50 backdrop-blur-xl">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-3">
+              <button
+                className="p-3.5 text-slate-500 hover:text-cyan-400 rounded-xl border border-white/5 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all"
+                title="Voice input"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+              
+              <div className="flex-1 relative">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask anything... (Shift+Enter for new line)"
+                  className="w-full p-3.5 pr-12 bg-slate-800/50 border border-white/10 rounded-xl resize-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent text-white placeholder-slate-500 backdrop-blur-sm"
+                  rows={1}
+                  style={{ minHeight: "52px", maxHeight: "120px" }}
+                />
+              </div>
+              
+              <button
+                onClick={handleSendMessage}
+                disabled={!input.trim() || isLoading}
+                className="p-3.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
             </div>
             
-            <button
-              onClick={handleSendMessage}
-              disabled={!input.trim() || isLoading}
-              className="p-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-cyan-500"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
+            <p className="text-xs text-slate-600 mt-3 text-center flex items-center justify-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3 h-3" />
+                End-to-end encrypted
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Shield className="w-3 h-3" />
+                Local execution
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Database className="w-3 h-3" />
+                No data leaves device
+              </span>
+            </p>
           </div>
-          
-          <p className="text-xs text-cyan-800 mt-2 text-center">
-            [SECURE] Local execution only • End-to-end encrypted • No data leaves device
-          </p>
         </div>
       </div>
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-slate-900 border border-cyan-700 rounded-lg w-[600px] max-h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900/95 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl backdrop-blur-xl">
             {/* Modal Header */}
-            <div className="p-4 border-b border-cyan-800 flex items-center justify-between bg-gradient-to-r from-cyan-950 to-slate-900">
-              <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                SYSTEM CONFIGURATION
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <Settings className="w-4 h-4 text-cyan-400" />
+                </div>
+                Configuration
               </h2>
               <button 
                 onClick={() => setShowSettings(false)}
-                className="text-cyan-600 hover:text-cyan-400"
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-cyan-800">
+            <div className="flex border-b border-white/5">
               {[
-                { id: "models", label: "MODELS", icon: Cpu },
-                { id: "api", label: "API KEYS", icon: Key },
-                { id: "network", label: "NETWORK", icon: Globe },
-                { id: "storage", label: "STORAGE", icon: Database }
+                { id: "models", label: "Models", icon: Cpu },
+                { id: "api", label: "API Keys", icon: Key },
+                { id: "network", label: "Network", icon: Globe },
+                { id: "storage", label: "Storage", icon: Database }
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 p-3 text-xs font-bold flex items-center justify-center gap-2 transition-colors ${
+                  className={`flex-1 p-3.5 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                     activeTab === tab.id 
-                      ? "bg-cyan-900/50 text-cyan-400 border-b-2 border-cyan-400" 
-                      : "text-cyan-700 hover:text-cyan-500"
+                      ? "text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5" 
+                      : "text-slate-500 hover:text-slate-300"
                   }`}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -487,78 +537,81 @@ export default function ChatPage() {
             {/* Tab Content */}
             <div className="p-6 max-h-[400px] overflow-y-auto">
               {activeTab === "models" && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-500">LOCAL MODELS</h3>
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-slate-400 mb-4">Available Models</h3>
                   {models.map((model) => (
-                    <div key={model.name} className="p-3 bg-slate-800 border border-cyan-800/50 rounded">
+                    <div key={model.name} className="p-4 bg-slate-800/50 border border-white/5 rounded-xl hover:border-cyan-500/20 transition-colors">
                       <div className="flex items-center justify-between">
-                        <span className="text-cyan-300 font-bold">{model.name}</span>
+                        <span className="text-white font-medium">{model.name}</span>
                         <button
                           onClick={() => setSelectedModel(model.name)}
-                          className={`px-3 py-1 text-xs rounded border ${
+                          className={`px-4 py-1.5 text-xs rounded-lg font-medium transition-colors ${
                             selectedModel === model.name
-                              ? "bg-cyan-700 border-cyan-500 text-white"
-                              : "bg-slate-700 border-cyan-800 text-cyan-400 hover:border-cyan-600"
+                              ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+                              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
                           }`}
                         >
-                          {selectedModel === model.name ? "ACTIVE" : "SELECT"}
+                          {selectedModel === model.name ? "Active" : "Select"}
                         </button>
                       </div>
-                      <p className="text-xs text-cyan-600 mt-1">{model.description}</p>
-                      <p className="text-xs text-cyan-700">Size: {model.size}</p>
+                      <p className="text-xs text-slate-500 mt-2">{model.description}</p>
+                      <p className="text-xs text-slate-600 mt-1">Size: {model.size}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               {activeTab === "api" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="text-xs font-bold text-cyan-500 block mb-2">
-                      OPENAI API KEY
+                    <label className="text-sm font-medium text-slate-400 block mb-2">
+                      OpenAI API Key
                     </label>
                     <input
                       type="password"
                       value={openaiKey}
                       onChange={(e) => setOpenaiKey(e.target.value)}
                       placeholder="sk-..."
-                      className="w-full p-2 bg-slate-800 border border-cyan-800 rounded text-cyan-300 text-sm"
+                      className="w-full p-3 bg-slate-800/50 border border-white/10 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-cyan-500 block mb-2">
-                      ANTHROPIC API KEY
+                    <label className="text-sm font-medium text-slate-400 block mb-2">
+                      Anthropic API Key
                     </label>
                     <input
                       type="password"
                       value={anthropicKey}
                       onChange={(e) => setAnthropicKey(e.target.value)}
                       placeholder="sk-ant-..."
-                      className="w-full p-2 bg-slate-800 border border-cyan-800 rounded text-cyan-300 text-sm"
+                      className="w-full p-3 bg-slate-800/50 border border-white/10 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
                     />
                   </div>
-                  <p className="text-xs text-cyan-700">
-                    API keys are encrypted and stored locally. Never transmitted to external servers.
-                  </p>
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <p className="text-sm text-emerald-400 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      API keys are encrypted and stored locally
+                    </p>
+                  </div>
                 </div>
               )}
 
               {activeTab === "network" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="text-xs font-bold text-cyan-500 block mb-2">
-                      OLLAMA HOST
+                    <label className="text-sm font-medium text-slate-400 block mb-2">
+                      Ollama Host
                     </label>
                     <input
                       type="text"
                       value={ollamaHost}
                       onChange={(e) => setOllamaHost(e.target.value)}
-                      className="w-full p-2 bg-slate-800 border border-cyan-800 rounded text-cyan-300 text-sm"
+                      className="w-full p-3 bg-slate-800/50 border border-white/10 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent"
                     />
                   </div>
-                  <div className="p-3 bg-green-950/30 border border-green-800/50 rounded">
-                    <p className="text-xs text-green-400">
-                      <CheckCircle className="w-4 h-4 inline mr-1" />
+                  <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+                    <p className="text-sm text-cyan-400 flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
                       Secure mode: Ollama bound to localhost only
                     </p>
                   </div>
@@ -567,31 +620,34 @@ export default function ChatPage() {
 
               {activeTab === "storage" && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-slate-800 border border-cyan-800/50 rounded">
-                    <p className="text-sm text-cyan-300">Data Vault Location</p>
-                    <p className="text-xs text-cyan-600">~/.config/closedpaw</p>
+                  <div className="p-4 bg-slate-800/50 border border-white/5 rounded-xl">
+                    <p className="text-sm text-white font-medium">Data Vault</p>
+                    <p className="text-sm text-slate-500 mt-1">~/.config/closedpaw</p>
                   </div>
-                  <div className="p-3 bg-slate-800 border border-cyan-800/50 rounded">
-                    <p className="text-sm text-cyan-300">Encryption Status</p>
-                    <p className="text-xs text-green-400">AES-256-GCM Active</p>
+                  <div className="p-4 bg-slate-800/50 border border-white/5 rounded-xl">
+                    <p className="text-sm text-white font-medium">Encryption</p>
+                    <p className="text-sm text-emerald-400 mt-1 flex items-center gap-2">
+                      <Lock className="w-4 h-4" />
+                      AES-256-GCM Active
+                    </p>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-cyan-800 flex justify-end gap-2">
+            <div className="p-5 border-t border-white/5 flex justify-end gap-3">
               <button
                 onClick={() => setShowSettings(false)}
-                className="px-4 py-2 text-sm text-cyan-400 hover:text-cyan-300"
+                className="px-5 py-2.5 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 onClick={saveSettings}
-                className="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white text-sm rounded border border-cyan-500"
+                className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white text-sm rounded-xl font-medium shadow-lg shadow-cyan-500/25"
               >
-                SAVE CONFIGURATION
+                Save Configuration
               </button>
             </div>
           </div>
