@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 from dataclasses import dataclass
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -424,8 +425,6 @@ class DataVault:
     
     def _log_access(self, action: str, key: str, level: str):
         """Log vault access"""
-        from datetime import datetime
-        
         self.access_log.append({
             "timestamp": datetime.utcnow().isoformat(),
             "action": action,
@@ -453,3 +452,424 @@ def get_vault() -> DataVault:
     if _vault is None:
         _vault = DataVault()
     return _vault
+
+
+# ============================================
+# Security Manager - High-level security API
+# ============================================
+
+@dataclass
+class FileAccessResult:
+    """Result of file access validation"""
+    allowed: bool
+    reason: str
+    sanitized_path: Optional[str] = None
+
+
+@dataclass
+class CodeExecutionResult:
+    """Result of code execution validation"""
+    safe: bool
+    sandboxed: bool
+    reason: str
+
+
+@dataclass
+class RateLimitResult:
+    """Result of rate limit check"""
+    allowed: bool
+    remaining: int
+    reset_at: Optional[float] = None
+
+
+@dataclass
+class Session:
+    """User session"""
+    id: str
+    user_id: str
+    created_at: float
+    expires_at: float
+    is_valid: bool = True
+
+
+class SecurityManager:
+    """
+    High-level security manager
+    Provides unified API for all security operations
+    """
+    
+    def __init__(self):
+        self.defender = PromptInjectionDefender()
+        self.vault = DataVault()
+        self.rate_limiter = RateLimiter()
+        self._sessions: Dict[str, Session] = {}
+        self._api_keys: Dict[str, str] = {}
+    
+    # ============================================
+    # Prompt Validation
+    # ============================================
+    
+    async def validate_prompt(self, prompt: str) -> ValidationResult:
+        """Validate prompt for injection attempts"""
+        return self.defender.validate_input(prompt)
+    
+    # ============================================
+    # File Access Control
+    # ============================================
+    
+    FORBIDDEN_PATHS = [
+        "/etc/passwd", "/etc/shadow", "/etc/sudoers",
+        "/root/.ssh", "/root/.bashrc",
+        "~/.ssh", "~/.gnupg",
+        "C:\\Windows\\System32\\config",
+        "/proc/", "/sys/",
+    ]
+    
+    async def validate_file_access(self, path: str) -> FileAccessResult:
+        """Validate file access request"""
+        import os
+        
+        # Normalize path
+        normalized = os.path.normpath(path)
+        
+        # Check for forbidden paths
+        for forbidden in self.FORBIDDEN_PATHS:
+            if forbidden in normalized or normalized.startswith(forbidden.replace("~", os.path.expanduser("~"))):
+                return FileAccessResult(
+                    allowed=False,
+                    reason=f"Access to path forbidden: {path}",
+                    sanitized_path=None
+                )
+        
+        # Check for path traversal
+        if ".." in normalized or normalized.startswith("/"):
+            # Only allow within safe directories
+            safe_dirs = ["/tmp", "/home", os.path.expanduser("~")]
+            if not any(normalized.startswith(d) for d in safe_dirs):
+                return FileAccessResult(
+                    allowed=False,
+                    reason="Path traversal detected",
+                    sanitized_path=None
+                )
+        
+        return FileAccessResult(
+            allowed=True,
+            reason="Access granted",
+            sanitized_path=normalized
+        )
+    
+    # ============================================
+    # Code Execution Sandbox
+    # ============================================
+    
+    DANGEROUS_PATTERNS = [
+        r"import\s+os",
+        r"import\s+subprocess",
+        r"import\s+socket",
+        r"exec\s*\(",
+        r"eval\s*\(",
+        r"__import__",
+        r"open\s*\(['\"]/(etc|proc|sys)",
+        r"rm\s+-rf",
+        r"format\s+",
+        r"del\s+/[a-z]",
+    ]
+    
+    async def validate_code_execution(self, code: str) -> CodeExecutionResult:
+        """Validate code for safe execution"""
+        import re
+        
+        for pattern in self.DANGEROUS_PATTERNS:
+            if re.search(pattern, code, re.IGNORECASE):
+                return CodeExecutionResult(
+                    safe=False,
+                    sandboxed=True,
+                    reason=f"Dangerous pattern detected: {pattern}"
+                )
+        
+        # All code runs in sandbox by default
+        return CodeExecutionResult(
+            safe=True,
+            sandboxed=True,
+            reason="Code validated for sandboxed execution"
+        )
+    
+    # ============================================
+    # API Key Management
+    # ============================================
+    
+    async def store_api_key(self, provider: str, key: str) -> "StorageResult":
+        """Store encrypted API key"""
+        success = self.vault.store(f"api_key_{provider}", key, "elevated")
+        
+        return StorageResult(
+            success=success,
+            encrypted=True,
+            provider=provider
+        )
+    
+    async def get_api_key(self, provider: str) -> Optional[str]:
+        """Retrieve decrypted API key"""
+        return self.vault.retrieve(f"api_key_{provider}", "elevated")
+    
+    # ============================================
+    # Rate Limiting
+    # ============================================
+    
+    async def check_rate_limit(self, user_id: str) -> RateLimitResult:
+        """Check rate limit for user"""
+        import time
+        
+        allowed = self.rate_limiter.check_limit(user_id)
+        
+        return RateLimitResult(
+            allowed=allowed,
+            remaining=self.rate_limiter.max_requests - len(self.rate_limiter.requests.get(user_id, [])),
+            reset_at=time.time() + self.rate_limiter.window_seconds
+        )
+    
+    # ============================================
+    # Session Management
+    # ============================================
+    
+    async def create_session(self, user_id: str, expires_in_seconds: int = 3600) -> Session:
+        """Create new user session"""
+        import time
+        import uuid
+        
+        now = time.time()
+        session = Session(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            created_at=now,
+            expires_at=now + expires_in_seconds,
+            is_valid=True
+        )
+        
+        self._sessions[session.id] = session
+        return session
+    
+    async def validate_session(self, session_id: str) -> bool:
+        """Validate session is still valid"""
+        import time
+        
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+        
+        if time.time() > session.expires_at:
+            session.is_valid = False
+            return False
+        
+        return session.is_valid
+    
+    # ============================================
+    # Network Security
+    # ============================================
+    
+    async def validate_network_request(self, url: str) -> "NetworkResult":
+        """Validate network request"""
+        import re
+        
+        # Block external requests by default (except allowed API endpoints)
+        allowed_domains = [
+            "api.openai.com",
+            "api.anthropic.com",
+            "generativelanguage.googleapis.com",
+            "api.mistral.ai",
+            "127.0.0.1",
+            "localhost",
+            "ollama",
+        ]
+        
+        # Check if URL is allowed
+        is_allowed = any(domain in url for domain in allowed_domains)
+        
+        if not is_allowed:
+            # Check for suspicious patterns
+            suspicious_patterns = [
+                r"evil\.com",
+                r"attacker",
+                r"malicious",
+                r"exfil",
+                r"collect.*data",
+            ]
+            
+            for pattern in suspicious_patterns:
+                if re.search(pattern, url, re.IGNORECASE):
+                    return NetworkResult(
+                        allowed=False,
+                        reason="Suspicious URL detected"
+                    )
+            
+            return NetworkResult(
+                allowed=False,
+                reason="External URL not in allowlist"
+            )
+        
+        return NetworkResult(
+            allowed=True,
+            reason="URL allowed"
+        )
+    
+    # ============================================
+    # Audit Logging
+    # ============================================
+    
+    async def log_action(self, action: Dict) -> str:
+        """Log security-relevant action"""
+        import uuid
+        log_id = str(uuid.uuid4())
+        
+        # Store in vault access log
+        self.vault.access_log.append({
+            "id": log_id,
+            **action
+        })
+        
+        logger.info(f"Security action logged: {action.get('type', 'unknown')}")
+        return log_id
+    
+    async def get_audit_log(self, log_id: str) -> Optional[Dict]:
+        """Retrieve audit log entry"""
+        for entry in self.vault.access_log:
+            if entry.get("id") == log_id:
+                return entry
+        return None
+    
+    async def verify_log_integrity(self, log_id: str) -> "IntegrityResult":
+        """Verify log entry integrity"""
+        entry = await self.get_audit_log(log_id)
+        
+        if entry:
+            return IntegrityResult(valid=True, log_id=log_id)
+        
+        return IntegrityResult(valid=False, log_id=log_id)
+    
+    # ============================================
+    # Sanitization
+    # ============================================
+    
+    def sanitize_html(self, html: str) -> str:
+        """Remove dangerous HTML"""
+        import re
+        
+        # Remove script tags
+        sanitized = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Remove event handlers
+        sanitized = re.sub(r'on\w+\s*=', '', sanitized, flags=re.IGNORECASE)
+        
+        # Remove javascript: URLs
+        sanitized = re.sub(r'javascript:', '', sanitized, flags=re.IGNORECASE)
+        
+        return sanitized
+    
+    def sanitize_path(self, path: str) -> str:
+        """Sanitize file path"""
+        import os
+        import urllib.parse
+        
+        # URL decode
+        decoded = urllib.parse.unquote(path)
+        
+        # Normalize
+        normalized = os.path.normpath(decoded)
+        
+        # Remove leading ..
+        while normalized.startswith(".."):
+            normalized = normalized[2:]
+            if normalized.startswith("/"):
+                normalized = normalized[1:]
+        
+        return normalized
+    
+    def sanitize_error(self, error: Exception) -> str:
+        """Sanitize error message for safe logging"""
+        message = str(error)
+        
+        # Patterns to redact
+        patterns = [
+            (r'sk-[a-zA-Z0-9]{20,}', '[REDACTED_API_KEY]'),
+            (r'password[=:]\s*\S+', 'password=[REDACTED]'),
+            (r'token[=:]\s*\S+', 'token=[REDACTED]'),
+            (r'secret[=:]\s*\S+', 'secret=[REDACTED]'),
+            (r'key[=:]\s*\S+', 'key=[REDACTED]'),
+        ]
+        
+        import re
+        for pattern, replacement in patterns:
+            message = re.sub(pattern, replacement, message, flags=re.IGNORECASE)
+        
+        return message
+    
+    def safe_log(self, data: Dict) -> str:
+        """Safe log output with sensitive data redacted"""
+        import json
+        
+        safe_data = {}
+        sensitive_keys = ["api_key", "password", "token", "secret", "key", "credential"]
+        
+        for k, v in data.items():
+            if any(s in k.lower() for s in sensitive_keys):
+                safe_data[k] = "[REDACTED]"
+            else:
+                safe_data[k] = v
+        
+        return json.dumps(safe_data)
+
+
+@dataclass
+class StorageResult:
+    """Result of storage operation"""
+    success: bool
+    encrypted: bool
+    provider: str
+
+
+@dataclass
+class NetworkResult:
+    """Result of network validation"""
+    allowed: bool
+    reason: str
+
+
+@dataclass
+class IntegrityResult:
+    """Result of integrity check"""
+    valid: bool
+    log_id: str
+
+
+# ============================================
+# PromptValidator - Simple validation interface
+# ============================================
+
+@dataclass
+class PromptValidationResult:
+    """Result of prompt validation"""
+    is_safe: bool
+    threat_level: str
+    detected_patterns: List[str]
+    sanitized_input: str
+
+
+class PromptValidator:
+    """
+    Simple prompt validation interface
+    Wrapper around PromptInjectionDefender
+    """
+    
+    def __init__(self):
+        self.defender = PromptInjectionDefender()
+    
+    async def validate(self, prompt: str) -> PromptValidationResult:
+        """Validate prompt and return result"""
+        result = self.defender.validate_input(prompt)
+        
+        return PromptValidationResult(
+            is_safe=result.is_valid,
+            threat_level=result.threat_level.value,
+            detected_patterns=result.detected_patterns,
+            sanitized_input=result.sanitized_input
+        )

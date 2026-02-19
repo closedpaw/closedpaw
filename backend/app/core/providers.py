@@ -542,3 +542,118 @@ def get_provider_manager() -> ProviderManager:
         ))
     
     return _provider_manager
+
+
+# ============================================
+# LLMProvider - Simplified interface
+# ============================================
+
+@dataclass
+class ModelInfo:
+    """Information about a model"""
+    name: str
+    description: str = ""
+    size: str = "Unknown"
+    parameters: str = "Unknown"
+
+
+class LLMProvider:
+    """
+    Simplified LLM provider interface
+    Provides easy access to models and chat functionality
+    """
+    
+    def __init__(self):
+        self.manager = get_provider_manager()
+        self._selected_model: Optional[str] = None
+        self._cloud_providers: Dict[str, bool] = {
+            "openai": False,
+            "anthropic": False,
+            "google": False,
+            "mistral": False,
+        }
+    
+    async def list_models(self) -> List[ModelInfo]:
+        """List all available models"""
+        models = []
+        
+        # Get models from all providers
+        all_models = await self.manager.list_all_models()
+        
+        for provider_name, model_names in all_models.items():
+            for model_name in model_names:
+                models.append(ModelInfo(
+                    name=model_name,
+                    description=f"Model from {provider_name}",
+                    size="Unknown",
+                    parameters="Unknown"
+                ))
+        
+        return models
+    
+    async def select_model(self, model_name: str) -> bool:
+        """Select a model for use"""
+        self._selected_model = model_name
+        return True
+    
+    def get_cloud_status(self) -> Dict[str, bool]:
+        """Get status of cloud providers"""
+        return self._cloud_providers.copy()
+    
+    def enable_cloud_provider(self, provider: str, api_key: str) -> bool:
+        """Enable a cloud provider with API key"""
+        if provider not in self._cloud_providers:
+            return False
+        
+        provider_types = {
+            "openai": ProviderType.OPENAI,
+            "anthropic": ProviderType.ANTHROPIC,
+            "google": ProviderType.GOOGLE,
+            "mistral": ProviderType.MISTRAL,
+        }
+        
+        config = ProviderConfig(
+            provider_type=provider_types[provider],
+            name=provider,
+            api_key=api_key,
+            enabled=True
+        )
+        
+        success = self.manager.register_provider(config)
+        if success:
+            self._cloud_providers[provider] = True
+        
+        return success
+    
+    async def chat(
+        self, 
+        message: str, 
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        **kwargs
+    ) -> ChatResponse:
+        """Send chat message"""
+        messages = []
+        
+        if system_prompt:
+            messages.append(ChatMessage(role="system", content=system_prompt))
+        
+        messages.append(ChatMessage(role="user", content=message))
+        
+        model = model or self._selected_model
+        
+        return await self.manager.chat(
+            messages=messages,
+            provider=provider,
+            model=model,
+            **kwargs
+        )
+    
+    async def health_check(self) -> Dict[str, bool]:
+        """Check health of all providers"""
+        return await self.manager.health_check_all()
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get provider status"""
+        return self.manager.get_status()
