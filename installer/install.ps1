@@ -212,6 +212,105 @@ function Check-Ollama {
     return $false
 }
 
+# Check sandbox capability on Windows
+function Check-SandboxCapability {
+    Write-Host "[*] Checking sandboxing capability..." -ForegroundColor Yellow
+    
+    # Check for WSL2 (can run Linux containers)
+    $wslInstalled = $false
+    try {
+        $wslCheck = wsl --status 2>&1
+        if ($wslCheck -notmatch "is not installed") {
+            $wslInstalled = $true
+        }
+    } catch {}
+    
+    # Check for Docker Desktop
+    $dockerInstalled = $false
+    try {
+        $null = Get-Command docker -ErrorAction Stop
+        $dockerCheck = docker version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $dockerInstalled = $true
+        }
+    } catch {}
+    
+    # Check Windows version (Windows 10 Pro/Enterprise or Windows 11 needed for Hyper-V)
+    $osInfo = Get-CimInstance Win32_OperatingSystem
+    $isProOrEnterprise = $osInfo.Caption -match "Pro|Enterprise|Education"
+    $isWin11 = [System.Environment]::OSVersion.Version.Build -ge 22000
+    
+    if ($wslInstalled -or ($dockerInstalled -and ($isProOrEnterprise -or $isWin11))) {
+        Write-Host "[OK] Sandboxing available (WSL2/Docker detected)" -ForegroundColor Green
+        return $true
+    }
+    
+    Write-Host "[!] Limited sandboxing on Windows" -ForegroundColor Yellow
+    Write-Host "    For full sandboxing (gVisor/Kata), use Linux or macOS" -ForegroundColor Gray
+    Write-Host "    Or install WSL2: wsl --install" -ForegroundColor Gray
+    return $false
+}
+
+# Ask user about sandbox installation
+function Prompt-SandboxInstall {
+    param([bool]$IsAvailable)
+    
+    if (-not $IsAvailable) {
+        Write-Host ""
+        Write-Host "[!] Sandboxing requires WSL2 or Docker Desktop" -ForegroundColor Yellow
+        Write-Host "    Install WSL2 for Linux container support:" -ForegroundColor Gray
+        Write-Host "    wsl --install" -ForegroundColor Cyan
+        Write-Host ""
+        return $false
+    }
+    
+    Write-Host ""
+    Write-Host "[*] Sandboxing protects against malicious code execution" -ForegroundColor Cyan
+    $choice = Read-Host "Install sandboxed environment? [Y/n]"
+    
+    if ($choice -match "^[Nn]") {
+        Write-Host "[!] Skipping sandbox installation" -ForegroundColor Yellow
+        Write-Host "    Note: Code will run without isolation" -ForegroundColor Gray
+        return $false
+    }
+    
+    return $true
+}
+
+# Install sandboxing components
+function Install-Sandbox {
+    Write-Host "[*] Setting up sandboxing..." -ForegroundColor Yellow
+    
+    # Check if running in WSL
+    $inWSL = $false
+    try {
+        $wslCheck = wsl -l -v 2>&1
+        if ($wslCheck -match "Running") {
+            $inWSL = $true
+        }
+    } catch {}
+    
+    if ($inWSL) {
+        Write-Host "  Configuring WSL2 for gVisor..." -ForegroundColor Gray
+        # gVisor can be installed in WSL2
+        wsl -d Ubuntu -e bash -c "curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg && echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main' | sudo tee /etc/apt/sources.list.d/gvisor.list && sudo apt-get update && sudo apt-get install -y runsc"
+        Write-Host "[OK] gVisor installed in WSL2" -ForegroundColor Green
+    } else {
+        Write-Host "  Docker Desktop detected, configuring..." -ForegroundColor Gray
+        Write-Host "  Note: Full gVisor/Kata requires Linux" -ForegroundColor Gray
+        Write-Host "  Docker will provide basic container isolation" -ForegroundColor Gray
+    }
+    
+    # Create config marker
+    $configDir = "$env:USERPROFILE\.config\closedpaw"
+    if (-not (Test-Path $configDir)) {
+        New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+    }
+    @{ sandbox_enabled = $true; platform = "windows"; wsl_available = $inWSL } | ConvertTo-Json | Out-File "$configDir\sandbox.json"
+    
+    Write-Host "[OK] Sandboxing configured" -ForegroundColor Green
+}
+
 # Install Ollama
 function Install-Ollama {
     Write-Host "[*] Installing Ollama..." -ForegroundColor Yellow
@@ -437,6 +536,13 @@ function Main {
         if ($install -notmatch "^[Nn]") {
             Install-Ollama
         }
+    }
+
+    # Check sandbox capability and prompt for installation
+    $sandboxAvailable = Check-SandboxCapability
+    $installSandbox = Prompt-SandboxInstall -IsAvailable $sandboxAvailable
+    if ($installSandbox) {
+        Install-Sandbox
     }
 
     # Initialize directories

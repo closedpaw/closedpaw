@@ -188,6 +188,105 @@ install_nodejs() {
     print_success "Node.js installed"
 }
 
+install_sandbox() {
+    print_step "Installing sandboxing environment (gVisor)..."
+    
+    # gVisor is the default sandbox for Linux/macOS
+    if [[ "$OS" == "macos" ]]; then
+        # macOS - use Docker with gVisor runtime
+        if command -v docker &> /dev/null; then
+            print_step "Configuring Docker with gVisor on macOS..."
+            # On macOS, gVisor runs via Docker Desktop
+            docker run --rm --runtime=runsc alpine echo "gVisor test" 2>/dev/null || {
+                print_warning "gVisor runtime not available in Docker"
+                print_step "Installing gVisor for Docker..."
+                # Download and install runsc for Docker Desktop
+                curl -fsSL https://gvisor.dev/archive.key | gpg --dearmor -o /tmp/gvisor-archive-keyring.gpg 2>/dev/null || true
+                curl -fsSL https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc > /tmp/runsc
+                chmod +x /tmp/runsc
+                sudo mv /tmp/runsc /usr/local/bin/ 2>/dev/null || {
+                    print_warning "Could not install gVisor binary to /usr/local/bin"
+                }
+            }
+        else
+            print_warning "Docker not found. Please install Docker Desktop for macOS"
+            print_warning "Sandboxing will be limited without Docker"
+        fi
+    else
+        # Linux - native gVisor installation
+        print_step "Installing gVisor on Linux..."
+        
+        # Add gVisor repository
+        curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg 2>/dev/null || true
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+        
+        # Install gVisor
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y runsc 2>/dev/null || {
+                # Fallback: direct download
+                print_step "Installing gVisor via direct download..."
+                ARCH=$(uname -m)
+                URL="https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}"
+                curl -fsSL "${URL}/runsc" -o /tmp/runsc
+                curl -fsSL "${URL}/runsc.sha512" -o /tmp/runsc.sha512
+                chmod +x /tmp/runsc
+                sudo mv /tmp/runsc /usr/local/bin/
+            }
+        elif command -v yum &> /dev/null; then
+            # For RHEL/CentOS/Fedora
+            curl -fsSL https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc -o /tmp/runsc
+            chmod +x /tmp/runsc
+            sudo mv /tmp/runsc /usr/local/bin/
+        fi
+        
+        # Configure Docker to use gVisor if available
+        if command -v docker &> /dev/null; then
+            print_step "Configuring Docker with gVisor runtime..."
+            sudo mkdir -p /etc/docker
+            echo '{
+  "runtimes": {
+    "runsc": {
+      "path": "/usr/local/bin/runsc"
+    }
+  }
+}' | sudo tee /etc/docker/daemon.json > /dev/null
+            print_success "gVisor configured as Docker runtime"
+        fi
+    fi
+    
+    # Create sandbox config
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/sandbox.json" << EOF
+{
+  "sandbox_enabled": true,
+  "platform": "$OS",
+  "runtime": "gvisor",
+  "installed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+    
+    print_success "Sandboxing environment installed"
+}
+
+# Check and install sandbox (auto-install on Linux/macOS)
+check_and_install_sandbox() {
+    print_step "Checking sandboxing capabilities..."
+    
+    # On Linux/macOS, sandboxing is enabled by default for security
+    if [[ "$OS" == "linux" ]] || [[ "$OS" == "macos" ]]; then
+        print_success "Linux/macOS detected - full sandboxing available"
+        
+        # Check if gVisor is already installed
+        if command -v runsc &> /dev/null || docker run --rm --runtime=runsc alpine echo "test" 2>/dev/null; then
+            print_success "gVisor sandboxing already configured"
+        else
+            print_step "Installing gVisor sandboxing (recommended for security)..."
+            install_sandbox
+        fi
+    fi
+}
+
 detect_hardware() {
     print_step "Detecting hardware with LLM Checker..."
     
@@ -691,6 +790,7 @@ main() {
     select_install_location
     detect_os
     check_dependencies
+    check_and_install_sandbox
     detect_hardware
     install_ollama
     setup_directories

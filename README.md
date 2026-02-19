@@ -14,16 +14,24 @@ ClosedPaw is a privacy-focused AI assistant that runs entirely on your local mac
 
 ## 🚀 Quick Start
 
-### npm Installation (Recommended)
+### Recommended Platform
+
+**Linux or macOS is strongly recommended** for the best security experience:
+
+- ✅ **Full gVisor/Kata sandboxing** - True kernel-level isolation
+- ✅ **Native container security** - No virtualization overhead
+- ✅ **Better AI model performance** - Direct GPU access
+- ⚠️ **Windows limitations** - Limited to Docker Desktop or WSL2; full sandboxing unavailable on Windows Home
+
+### npm Installation (Cross-platform)
 
 ```bash
 npm install -g closedpaw
-closedpaw install
 ```
 
 ### One-Command Installation (Alternative)
 
-**Linux / macOS:**
+**Linux / macOS (Recommended):**
 ```bash
 curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
 ```

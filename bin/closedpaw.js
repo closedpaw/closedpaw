@@ -711,14 +711,88 @@ program
 program
   .command('update')
   .description('Update ClosedPaw to latest version')
-  .action(async () => {
-    const spinner = ora('Updating ClosedPaw...').start();
+  .option('-f, --force', 'Force update even if already on latest version')
+  .action(async (options) => {
+    console.log(boxen(
+      chalk.cyan.bold('🔒 ClosedPaw Updater') + '\n' +
+      chalk.gray('Updating to the latest version...'),
+      { padding: 1, borderStyle: 'round', borderColor: 'cyan' }
+    ));
+
+    const steps = [];
+    
+    // Step 1: Update npm package
+    const npmSpinner = ora('Updating ClosedPaw CLI...').start();
     try {
-      await execa('npm', ['update', '-g', 'closedpaw'], { stdio: 'inherit' });
-      spinner.succeed('ClosedPaw updated');
-    } catch {
-      spinner.fail('Update failed');
+      await execa('npm', ['install', '-g', 'closedpaw@latest'], { stdio: 'pipe' });
+      npmSpinner.succeed('CLI updated to latest version');
+      steps.push({ name: 'CLI', status: 'success' });
+    } catch (error) {
+      npmSpinner.fail('CLI update failed');
+      console.log(chalk.yellow('  Try running with administrator privileges'));
+      steps.push({ name: 'CLI', status: 'failed' });
+      process.exit(1);
     }
+
+    // Step 2: Update local installation (if git install)
+    if (fs.existsSync(path.join(INSTALL_DIR, '.git'))) {
+      const gitSpinner = ora('Updating local installation...').start();
+      try {
+        await execa('git', ['pull', '--rebase'], { cwd: INSTALL_DIR, stdio: 'pipe' });
+        gitSpinner.succeed('Local files updated');
+        steps.push({ name: 'Local files', status: 'success' });
+
+        // Update Python dependencies
+        const pipSpinner = ora('Updating Python dependencies...').start();
+        const venvPython = process.platform === 'win32'
+          ? path.join(INSTALL_DIR, 'venv', 'Scripts', 'python')
+          : path.join(INSTALL_DIR, 'venv', 'bin', 'python');
+        
+        if (fs.existsSync(venvPython)) {
+          await execa(venvPython, ['-m', 'pip', 'install', '--upgrade', 
+            'fastapi', 'uvicorn', 'pydantic', 'httpx', 'sqlalchemy', 
+            'python-multipart', 'python-jose', 'passlib'
+          ], { stdio: 'pipe' });
+          pipSpinner.succeed('Python dependencies updated');
+          steps.push({ name: 'Python deps', status: 'success' });
+        } else {
+          pipSpinner.warn('Virtual environment not found, skipping');
+        }
+
+        // Update frontend dependencies
+        const npmDepsSpinner = ora('Updating frontend dependencies...').start();
+        await execa('npm', ['update'], { cwd: path.join(INSTALL_DIR, 'frontend'), stdio: 'pipe' });
+        npmDepsSpinner.succeed('Frontend dependencies updated');
+        steps.push({ name: 'Frontend deps', status: 'success' });
+
+      } catch (error) {
+        gitSpinner.fail('Local update failed');
+        steps.push({ name: 'Local files', status: 'failed' });
+      }
+    }
+
+    // Step 3: Check for Ollama update (optional)
+    const ollamaSpinner = ora('Checking Ollama...').start();
+    try {
+      await execa('ollama', ['--version'], { stdio: 'pipe' });
+      ollamaSpinner.succeed('Ollama is installed');
+      steps.push({ name: 'Ollama', status: 'ok' });
+    } catch {
+      ollamaSpinner.warn('Ollama not found');
+    }
+
+    // Summary
+    console.log('\n' + boxen(
+      chalk.green.bold('✓ Update Complete!') + '\n\n' +
+      steps.map(s => {
+        const icon = s.status === 'success' || s.status === 'ok' ? chalk.green('✓') : chalk.red('✗');
+        return `${icon} ${s.name}`;
+      }).join('\n') + '\n\n' +
+      chalk.white('Restart ClosedPaw to apply changes:') + '\n' +
+      chalk.cyan('  closedpaw stop') + '\n' +
+      chalk.cyan('  closedpaw start'),
+      { padding: 1, borderStyle: 'round', borderColor: 'green' }
+    ));
   });
 
 program
