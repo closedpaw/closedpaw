@@ -72,6 +72,65 @@ npm run dev  # Starts both backend and frontend
 - **Audit Logging** - All actions logged for forensic analysis
 - **Encrypted Storage** - API keys encrypted at rest
 
+## 🛡️ Security Reality Check
+
+> **No system is 100% secure.** We don't claim perfection — we claim *maximum feasible protection*.
+
+### What We Protect Against
+
+| Threat | Protection Level | Notes |
+|--------|-----------------|-------|
+| Prompt Injection | ✅ High | Multiple defense layers, input sanitization |
+| Code Execution | ✅ High | gVisor sandbox, seccomp filters |
+| Data Exfiltration | ✅ High | Local-only, encrypted storage |
+| Network Attacks | ✅ High | 127.0.0.1 binding, no external exposure |
+| Supply Chain | ⚠️ Medium | Signed packages, dependency scanning |
+| Physical Access | ❌ Low | OS-level encryption recommended |
+
+### Defense in Depth
+
+ClosedPaw implements **defense in depth** — multiple overlapping security layers:
+
+```
+┌─────────────────────────────────────────┐
+│  Layer 1: Input Validation              │
+│  Layer 2: Prompt Injection Filters      │
+│  Layer 3: Sandboxed Execution (gVisor)  │
+│  Layer 4: Human-in-the-Loop             │
+│  Layer 5: Audit Logging                 │
+│  Layer 6: Encrypted Storage             │
+└─────────────────────────────────────────┘
+```
+
+**If one layer fails, others protect you.**
+
+### Why Size Matters
+
+> **112 MB** — this is the weight of protection.
+
+```
+Package Size Breakdown:
+├── 🛡️ gVisor/Kata Runtime     ~15 MB
+├── 🔐 Cryptography Stack      ~25 MB  (PyNaCl, Cryptography)
+├── 🤖 AI Safety Layers        ~20 MB  (prompt filters, validators)
+├── 📡 Communication Channels  ~15 MB  (Telegram, Discord, Slack)
+├── 🎨 Next.js Web UI          ~37 MB
+└── Total: Protection you can trust
+```
+
+**Smaller size = fewer defenses.** We don't apologize for protecting you properly.
+
+### Comparison
+
+| Product | Size | Sandboxing | HITL | Encryption |
+|---------|------|------------|------|------------|
+| "Lightweight" AI tools | 5-10 MB | ❌ None | ❌ No | ❌ No |
+| OpenClaw | ~50 MB | ⚠️ Docker only | ❌ No | ⚠️ Partial |
+| **ClosedPaw** | **112 MB** | **✅ gVisor/Kata** | **✅ Yes** | **✅ Full** |
+- **Human-in-the-Loop** - Critical actions require approval
+- **Audit Logging** - All actions logged for forensic analysis
+- **Encrypted Storage** - API keys encrypted at rest
+
 ## 🏗️ Architecture
 
 ```

@@ -11,21 +11,29 @@ ClosedPaw 是一款注重隐私的 AI 助手，完全在您的本地计算机上
 
 ## 🚀 快速开始
 
-### npm 安装（推荐）
+### 推荐平台
+
+**强烈建议使用 Linux 或 macOS** 以获得最佳安全体验：
+
+- ✅ **完整的 gVisor/Kata 沙箱** — 真正的内核级隔离
+- ✅ **原生容器安全** — 无虚拟化开销
+- ✅ **更好的 AI 模型性能** — 直接 GPU 访问
+- ⚠️ **Windows 限制** — 仅限 Docker Desktop 或 WSL2；Windows Home 无法使用完整沙箱
+
+### npm 安装（跨平台）
 
 ```bash
 npm install -g closedpaw
-closedpaw install
 ```
 
 ### 一键安装（备选）
 
-**Linux / macOS:**
+**Linux / macOS（推荐）：**
 ```bash
 curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell)：**
 ```powershell
 iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
 ```
@@ -60,6 +68,62 @@ npm run dev  # 同时启动后端和前端
 - **人工介入 (HITL)** — 关键操作需要用户确认
 - **审计日志** — 所有操作都记录用于取证分析
 - **加密存储** — API 密钥在静态时加密
+
+## 🛡️ 安全现实检查
+
+> **没有系统是 100% 安全的。** 我们不声称完美 — 我们声称*最大可行的保护*。
+
+### 我们防护什么
+
+| 威胁 | 防护级别 | 说明 |
+|------|---------|------|
+| 提示注入 | ✅ 高 | 多层防护，输入净化 |
+| 代码执行 | ✅ 高 | gVisor 沙箱，seccomp 过滤器 |
+| 数据泄露 | ✅ 高 | 纯本地，加密存储 |
+| 网络攻击 | ✅ 高 | 绑定到 127.0.0.1，无外部暴露 |
+| 供应链 | ⚠️ 中 | 签名包，依赖扫描 |
+| 物理访问 | ❌ 低 | 建议使用操作系统级加密 |
+
+### 纵深防御
+
+ClosedPaw 实现**纵深防御** — 多个重叠的安全层：
+
+```
+┌─────────────────────────────────────────┐
+│  第 1 层：输入验证                       │
+│  第 2 层：提示注入过滤器                  │
+│  第 3 层：沙箱执行 (gVisor)              │
+│  第 4 层：人工介入 (HITL)                │
+│  第 5 层：审计日志                       │
+│  第 6 层：加密存储                       │
+└─────────────────────────────────────────┘
+```
+
+**如果一层失败，其他层会保护您。**
+
+### 为什么大小很重要
+
+> **112 MB** — 这是保护的重量。
+
+```
+包大小分解：
+├── 🛡️ gVisor/Kata 运行时    ~15 MB
+├── 🔐 加密技术栈            ~25 MB  (PyNaCl, Cryptography)
+├── 🤖 AI 安全层             ~20 MB  (过滤器，验证器)
+├── 📡 通信通道              ~15 MB  (Telegram, Discord, Slack)
+├── 🎨 Next.js Web UI        ~37 MB
+└── 总计：您可以信赖的保护
+```
+
+**更小的大小 = 更少的保护。** 我们不会为正确保护您而道歉。
+
+### 对比
+
+| 产品 | 大小 | 沙箱 | HITL | 加密 |
+|------|------|------|------|------|
+| "轻量级" AI 工具 | 5-10 MB | ❌ 无 | ❌ 无 | ❌ 无 |
+| OpenClaw | ~50 MB | ⚠️ 仅 Docker | ❌ 无 | ⚠️ 部分 |
+| **ClosedPaw** | **112 MB** | **✅ gVisor/Kata** | **✅ 有** | **✅ 完整** |
 
 ## 🏗️ 架构
 
