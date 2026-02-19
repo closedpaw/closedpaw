@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Development
+.git/
+.github/
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Tests
+tests/
+*.test.*
+*.spec.*
+
+# Misc
+.DS_Store
+*.log
+*.tmp
+.env
+.env.*
+!.env.example
+
+# Installer scripts (not needed in Docker)
+installer/
+bin/
+
+# Documentation
+docs/

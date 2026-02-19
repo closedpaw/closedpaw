@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # ClosedPaw Main Service
+  # ============================================
+  closedpaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: closedpaw
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=ollama:11434
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - closedpaw-config:/home/closedpaw/.config/closedpaw
+      - closedpaw-data:/home/closedpaw/.local/share/closedpaw
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - closedpaw-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+  # ============================================
+  # Ollama LLM Service
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - closedpaw-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ============================================
+  # gVisor Sandbox (optional)
+  # ============================================
+  # Note: Requires gVisor runtime on host
+  # Run: docker run --runtime=runsc ...
+
+networks:
+  closedpaw-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  closedpaw-config:
+  closedpaw-data:
+  ollama-data:
