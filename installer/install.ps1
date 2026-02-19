@@ -45,7 +45,7 @@ function Select-InstallLocation {
     $script:InstallDir = $DefaultInstallDir
     $script:ConfigDir = $DefaultConfigDir
     $script:TempDir = $DefaultTempDir
-    $script:LogFile = "$script:TempDir\securesphere-install.log"
+    $script:LogFile = "$script:TempDir\closedpaw-install.log"
     
     try {
         New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
@@ -75,8 +75,8 @@ function Print-Banner {
     Write-Host "==============================================" -ForegroundColor Cyan
     Write-Host "        ClosedPaw Installer                  " -ForegroundColor Cyan
     Write-Host "   One command - and it works.               " -ForegroundColor Cyan
-    Write-Host "==============================================" -ForegroundColor Cyan
-    Write-Host "
+    Write-Host "=============================================" -ForegroundColor Cyan
+    Write-Host ""
 }
 
 function Test-Administrator {
@@ -494,11 +494,11 @@ if (-not `$ollamaRunning.TcpTestSucceeded) {
     Start-Sleep -Seconds 3
 }
 
-Write-Host `"Starting SecureSphere AI backend...`"
-Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.securesphere-ai\backend'; ..\venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000`" -WindowStyle Normal
+Write-Host `"Starting ClosedPaw backend...`"
+Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.closedpaw\backend'; ..\venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000`" -WindowStyle Normal
 
 Write-Host `"Starting Web UI...`"
-Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.securesphere-ai\frontend'; npm run dev`" -WindowStyle Normal
+Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.closedpaw\frontend'; npm run dev`" -WindowStyle Normal
 
 Write-Host "ClosedPaw is running!"
 Write-Host `"Web UI: http://localhost:3000`"
