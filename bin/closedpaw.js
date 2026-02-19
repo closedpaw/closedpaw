@@ -51,20 +51,27 @@ function showBanner() {
 
 // Check if Python is installed
 async function checkPython() {
-  try {
-    const { stdout } = await execa('python', ['--version']);
-    const version = stdout.match(/Python (\d+)\.(\d+)/);
-    if (version) {
-      const major = parseInt(version[1]);
-      const minor = parseInt(version[2]);
-      if (major < 3 || (major === 3 && minor < 11)) {
-        throw new Error('Python 3.11+ required');
+  const pythonCommands = process.platform === 'win32' 
+    ? ['python', 'python3', 'py'] 
+    : ['python3', 'python'];
+  
+  for (const cmd of pythonCommands) {
+    try {
+      const { stdout, stderr } = await execa(cmd, ['--version'], { reject: false });
+      const output = stdout || stderr || '';
+      const version = output.match(/Python (\d+)\.(\d+)/i);
+      if (version) {
+        const major = parseInt(version[1]);
+        const minor = parseInt(version[2]);
+        if (major > 3 || (major === 3 && minor >= 11)) {
+          return true;
+        }
       }
+    } catch {
+      continue;
     }
-    return true;
-  } catch {
-    return false;
   }
+  return false;
 }
 
 // Check if Ollama is installed
