@@ -1,577 +1,464 @@
 # ClosedPaw Installer for Windows
-# One-command installation: iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
+# Usage: iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
+#        & ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1))) -Tag beta -DryRun
 
 param(
-    [switch]$Silent,
-    [string]$InstallDir = "",
-    [string]$ConfigDir = "",
-    [string]$TempDir = ""
+    [string]$Tag = "latest",
+    [ValidateSet("npm", "git")]
+    [string]$InstallMethod = "npm",
+    [string]$GitDir,
+    [switch]$NoOnboard,
+    [switch]$NoGitUpdate,
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
 
-# Default Configuration
-$DefaultInstallDir = "$env:USERPROFILE\.closedpaw"
-$DefaultConfigDir = "$env:USERPROFILE\.config\closedpaw"
-$DefaultTempDir = "$env:TEMP"
-$RequiredPythonVersion = "3.11"
+Write-Host ""
+Write-Host "  ClosedPaw Installer" -ForegroundColor Cyan
+Write-Host "  Zero-Trust AI Assistant" -ForegroundColor Gray
+Write-Host ""
 
-# These will be set after user selection
-$script:InstallDir = $null
-$script:ConfigDir = $null
-$script:TempDir = $null
-$script:LogFile = $null
+# Check PowerShell version
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    Write-Host "Error: PowerShell 5+ required" -ForegroundColor Red
+    exit 1
+}
 
-function Write-Log {
-    param($Message, $Level = "INFO")
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logEntry = "[$timestamp] [$Level] $Message"
-    if ($script:LogFile) {
-        Add-Content -Path $script:LogFile -Value $logEntry
+Write-Host "[OK] Windows detected" -ForegroundColor Green
+
+# Environment variable overrides
+if (-not $PSBoundParameters.ContainsKey("InstallMethod")) {
+    if (-not [string]::IsNullOrWhiteSpace($env:CLOSEDPAW_INSTALL_METHOD)) {
+        $InstallMethod = $env:CLOSEDPAW_INSTALL_METHOD
     }
-    
-    switch ($Level) {
-        "SUCCESS" { Write-Host $Message -ForegroundColor Green }
-        "WARNING" { Write-Host $Message -ForegroundColor Yellow }
-        "ERROR" { Write-Host $Message -ForegroundColor Red }
-        "STEP" { Write-Host $Message -ForegroundColor Cyan }
-        default { Write-Host $Message }
+}
+if (-not $PSBoundParameters.ContainsKey("GitDir")) {
+    if (-not [string]::IsNullOrWhiteSpace($env:CLOSEDPAW_GIT_DIR)) {
+        $GitDir = $env:CLOSEDPAW_GIT_DIR
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("NoOnboard")) {
+    if ($env:CLOSEDPAW_NO_ONBOARD -eq "1") {
+        $NoOnboard = $true
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("NoGitUpdate")) {
+    if ($env:CLOSEDPAW_GIT_UPDATE -eq "0") {
+        $NoGitUpdate = $true
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("DryRun")) {
+    if ($env:CLOSEDPAW_DRY_RUN -eq "1") {
+        $DryRun = $true
     }
 }
 
-function Select-InstallLocation {
-    Write-Log "Setting up installation location..." "STEP"
-    
-    $script:InstallDir = $DefaultInstallDir
-    $script:ConfigDir = $DefaultConfigDir
-    $script:TempDir = $DefaultTempDir
-    $script:LogFile = "$script:TempDir\closedpaw-install.log"
-    
+if ([string]::IsNullOrWhiteSpace($GitDir)) {
+    $userHome = [Environment]::GetFolderPath("UserProfile")
+    $GitDir = (Join-Path $userHome ".closedpaw")
+}
+
+# Check for Python 3.11+
+function Check-Python {
+    $pythonCommands = @("python", "python3", "py")
+    foreach ($cmd in $pythonCommands) {
+        try {
+            $version = & $cmd --version 2>&1
+            if ($version -match "Python (\d+)\.(\d+)") {
+                $major = [int]$matches[1]
+                $minor = [int]$matches[2]
+                if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 11)) {
+                    Write-Host "[OK] Python $major.$minor found ($cmd)" -ForegroundColor Green
+                    return $cmd
+                }
+            }
+        } catch {}
+    }
+    Write-Host "[!] Python 3.11+ not found" -ForegroundColor Yellow
+    return $null
+}
+
+# Install Python
+function Install-Python {
+    Write-Host "[*] Installing Python 3.12..." -ForegroundColor Yellow
+
+    # Try winget first
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "  Using winget..." -ForegroundColor Gray
+        winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "[OK] Python installed via winget" -ForegroundColor Green
+        return
+    }
+
+    # Try Chocolatey
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host "  Using Chocolatey..." -ForegroundColor Gray
+        choco install python312 -y
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "[OK] Python installed via Chocolatey" -ForegroundColor Green
+        return
+    }
+
+    # Try Scoop
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "  Using Scoop..." -ForegroundColor Gray
+        scoop install python
+        Write-Host "[OK] Python installed via Scoop" -ForegroundColor Green
+        return
+    }
+
+    # Manual download fallback
+    Write-Host ""
+    Write-Host "Error: Could not find a package manager (winget, choco, or scoop)" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Please install Python 3.11+ manually:" -ForegroundColor Yellow
+    Write-Host "  https://python.org/downloads/" -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
+}
+
+# Check for Node.js
+function Check-Node {
     try {
-        New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
-        New-Item -ItemType Directory -Force -Path $script:ConfigDir | Out-Null
-        New-Item -ItemType Directory -Force -Path $script:TempDir | Out-Null
+        $nodeVersion = (node -v 2>$null)
+        if ($nodeVersion) {
+            $version = [int]($nodeVersion -replace 'v(\d+)\..*', '$1')
+            if ($version -ge 18) {
+                Write-Host "[OK] Node.js $nodeVersion found" -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "[!] Node.js $nodeVersion found, but v18+ required" -ForegroundColor Yellow
+                return $false
+            }
+        }
     } catch {
-        Write-Log "Failed to create directories: $_" "ERROR"
-        exit 1
+        Write-Host "[!] Node.js not found" -ForegroundColor Yellow
+        return $false
     }
-    
-    $drive = (Get-Item $script:InstallDir).PSDrive.Name
-    $disk = Get-PSDrive -Name $drive
-    $availableGB = [math]::Round($disk.Free / 1GB, 2)
-    
-    if ($availableGB -lt 2) {
-        Write-Log "Low disk space: $availableGB GB available (recommended: 2GB+)" "WARNING"
+    return $false
+}
+
+# Install Node.js
+function Install-Node {
+    Write-Host "[*] Installing Node.js..." -ForegroundColor Yellow
+
+    # Try winget first
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "  Using winget..." -ForegroundColor Gray
+        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "[OK] Node.js installed via winget" -ForegroundColor Green
+        return
     }
+
+    # Try Chocolatey
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host "  Using Chocolatey..." -ForegroundColor Gray
+        choco install nodejs-lts -y
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "[OK] Node.js installed via Chocolatey" -ForegroundColor Green
+        return
+    }
+
+    # Try Scoop
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "  Using Scoop..." -ForegroundColor Gray
+        scoop install nodejs-lts
+        Write-Host "[OK] Node.js installed via Scoop" -ForegroundColor Green
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Error: Could not find a package manager" -ForegroundColor Red
+    Write-Host "Please install Node.js 18+ manually: https://nodejs.org" -ForegroundColor Yellow
+    exit 1
+}
+
+# Check for Git
+function Check-Git {
+    try {
+        $null = Get-Command git -ErrorAction Stop
+        Write-Host "[OK] Git found" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "[!] Git not found" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+# Check for Ollama
+function Check-Ollama {
+    $ollamaPaths = @(
+        "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+        "$env:ProgramFiles\Ollama\ollama.exe"
+    )
     
-    Write-Log "Installation location set:" "SUCCESS"
-    Write-Log "  Install: $($script:InstallDir)" "SUCCESS"
-    Write-Log "  Config:  $($script:ConfigDir)" "SUCCESS"
-    Write-Log "  Temp:    $($script:TempDir)" "SUCCESS"
-}
-
-function Print-Banner {
-    Write-Host ""
-    Write-Host "==============================================" -ForegroundColor Cyan
-    Write-Host "        ClosedPaw Installer                  " -ForegroundColor Cyan
-    Write-Host "   One command - and it works.               " -ForegroundColor Cyan
-    Write-Host "=============================================" -ForegroundColor Cyan
-    Write-Host ""
-}
-
-function Test-Administrator {
-    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
-function Get-OSInfo {
-    Write-Log "Detecting Windows version..." "STEP"
-    $osInfo = Get-CimInstance Win32_OperatingSystem
-    Write-Log "Windows Version: $($osInfo.Caption)" "SUCCESS"
-    Write-Log "Build: $($osInfo.BuildNumber)" "SUCCESS"
-    return $osInfo
-}
-
-function Test-Dependencies {
-    Write-Log "Checking dependencies..." "STEP"
+    foreach ($path in $ollamaPaths) {
+        if (Test-Path $path) {
+            Write-Host "[OK] Ollama found" -ForegroundColor Green
+            return $true
+        }
+    }
     
     try {
-        $pythonVersion = (python --version 2>&1).ToString()
-        Write-Log "Python found: $pythonVersion" "SUCCESS"
+        $null = Get-Command ollama -ErrorAction Stop
+        Write-Host "[OK] Ollama found" -ForegroundColor Green
+        return $true
+    } catch {}
+    
+    Write-Host "[!] Ollama not found (optional, for local LLM)" -ForegroundColor Yellow
+    return $false
+}
+
+# Install Ollama
+function Install-Ollama {
+    Write-Host "[*] Installing Ollama..." -ForegroundColor Yellow
+    
+    $ollamaUrl = "https://ollama.com/download/OllamaSetup.exe"
+    $installer = "$env:TEMP\OllamaSetup.exe"
+    
+    try {
+        Invoke-WebRequest -Uri $ollamaUrl -OutFile $installer -UseBasicParsing
+        Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+        Remove-Item $installer -ErrorAction SilentlyContinue
+        Write-Host "[OK] Ollama installed" -ForegroundColor Green
         
-        $versionMatch = $pythonVersion -match "Python (\d+)\.(\d+)"
-        if ($versionMatch) {
-            $major = [int]$matches[1]
-            $minor = [int]$matches[2]
-            
-            if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 11)) {
-                Write-Log ("Python 3.11+ required. Found: " + $major + "." + $minor) "ERROR"
-                Write-Log "Please upgrade Python from https://python.org" "ERROR"
+        # Configure security
+        [System.Environment]::SetEnvironmentVariable("OLLAMA_HOST", "127.0.0.1:11434", "User")
+        [System.Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "*", "User")
+    } catch {
+        Write-Host "[!] Failed to install Ollama: $_" -ForegroundColor Yellow
+        Write-Host "    Install manually from: https://ollama.com" -ForegroundColor Gray
+    }
+}
+
+# Check for existing ClosedPaw installation
+function Check-ExistingClosedPaw {
+    try {
+        $null = Get-Command closedpaw -ErrorAction Stop
+        Write-Host "[*] Existing ClosedPaw installation detected" -ForegroundColor Yellow
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# Ensure closedpaw is on PATH
+function Ensure-ClosedPawOnPath {
+    if (Get-Command closedpaw -ErrorAction SilentlyContinue) {
+        return $true
+    }
+
+    $npmPrefix = $null
+    try {
+        $npmPrefix = (npm config get prefix 2>$null).Trim()
+    } catch {}
+
+    if (-not [string]::IsNullOrWhiteSpace($npmPrefix)) {
+        $npmBin = Join-Path $npmPrefix "bin"
+        $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+        if (-not ($userPath -split ";" | Where-Object { $_ -ieq $npmBin })) {
+            [Environment]::SetEnvironmentVariable("Path", "$userPath;$npmBin", "User")
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            Write-Host "[!] Added $npmBin to user PATH" -ForegroundColor Yellow
+        }
+        if (Test-Path (Join-Path $npmBin "closedpaw.cmd")) {
+            return $true
+        }
+    }
+
+    Write-Host "[!] closedpaw is not on PATH yet. Restart PowerShell." -ForegroundColor Yellow
+    return $false
+}
+
+# Install ClosedPaw via npm
+function Install-ClosedPaw {
+    if ([string]::IsNullOrWhiteSpace($Tag)) {
+        $Tag = "latest"
+    }
+    
+    $packageName = "closedpaw"
+    Write-Host "[*] Installing ClosedPaw ($packageName@$Tag)..." -ForegroundColor Yellow
+    
+    # Silence npm output
+    $env:NPM_CONFIG_LOGLEVEL = "error"
+    $env:NPM_CONFIG_UPDATE_NOTIFIER = "false"
+    $env:NPM_CONFIG_FUND = "false"
+    $env:NPM_CONFIG_AUDIT = "false"
+    
+    try {
+        if ($DryRun) {
+            Write-Host "  [DRY RUN] Would run: npm install -g $packageName@$Tag" -ForegroundColor Gray
+        } else {
+            $npmOutput = npm install -g "$packageName@$Tag" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[!] npm install failed" -ForegroundColor Red
+                $npmOutput | ForEach-Object { Write-Host $_ }
                 exit 1
             }
         }
-    } catch {
-        Write-Log "Python not found. Please install Python 3.11+ from https://python.org" "ERROR"
-        exit 1
+    } finally {
+        $env:NPM_CONFIG_LOGLEVEL = $null
+        $env:NPM_CONFIG_UPDATE_NOTIFIER = $null
+        $env:NPM_CONFIG_FUND = $null
+        $env:NPM_CONFIG_AUDIT = $null
     }
     
-    try {
-        $gitVersion = git --version
-        Write-Log "Git found: $gitVersion" "SUCCESS"
-    } catch {
-        Write-Log "Git not found. Will install if needed" "WARNING"
-    }
-    
-    try {
-        $nodeVersion = node --version
-        Write-Log "Node.js found: $nodeVersion" "SUCCESS"
-    } catch {
-        Write-Log "Node.js not found. Will install..." "WARNING"
-        Install-NodeJS
-    }
+    Write-Host "[OK] ClosedPaw installed" -ForegroundColor Green
 }
 
-function Install-NodeJS {
-    Write-Log "Installing Node.js..." "STEP"
-    
-    try {
-        $nodeUrl = "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi"
-        $nodeInstaller = "$env:TEMP\nodejs.msi"
-        
-        Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeInstaller
-        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $nodeInstaller, "/quiet", "/norestart" -Wait
-        
-        $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
-        
-        Write-Log "Node.js installed successfully" "SUCCESS"
-    } catch {
-        Write-Log "Failed to install Node.js automatically" "ERROR"
-        Write-Log "Please install manually from https://nodejs.org" "ERROR"
-        exit 1
-    }
-}
-
-function Get-OllamaPath {
-    # Check if ollama is in PATH
-    $ollamaInPath = Get-Command ollama -ErrorAction SilentlyContinue
-    if ($ollamaInPath) {
-        return $ollamaInPath.Source
-    }
-    
-    # Check common installation locations
-    $possiblePaths = @(
-        "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
-        "$env:ProgramFiles\Ollama\ollama.exe",
-        "$env:ProgramFiles(x86)\Ollama\ollama.exe",
-        "$env:USERPROFILE\AppData\Local\Programs\Ollama\ollama.exe"
+# Install from GitHub
+function Install-ClosedPawFromGit {
+    param(
+        [string]$RepoDir,
+        [switch]$SkipUpdate
     )
     
-    foreach ($path in $possiblePaths) {
-        if (Test-Path $path) {
-            return $path
-        }
-    }
-    
-    return $null
-}
+    $repoUrl = "https://github.com/logansin/closedpaw.git"
+    Write-Host "[*] Installing ClosedPaw from GitHub ($repoUrl)..." -ForegroundColor Yellow
 
-function Get-OllamaVersion {
-    $ollamaPath = Get-OllamaPath
-    if ($ollamaPath) {
-        try {
-            $versionOutput = & $ollamaPath --version 2>$null
-            if ($versionOutput -match '(\d+\.\d+\.\d+)') {
-                return $matches[1]
-            }
-        } catch {
-            return $null
-        }
-    }
-    return $null
-}
-
-function Compare-Versions($version1, $version2) {
-    $v1 = [version]$version1
-    $v2 = [version]$version2
-    return $v1 -ge $v2
-}
-
-function Install-Ollama {
-    Write-Log "Checking Ollama installation..." "STEP"
-    
-    $minVersion = "0.3.0"
-    $currentVersion = Get-OllamaVersion
-    
-    if ($currentVersion) {
-        Write-Log "Ollama found: version $currentVersion" "SUCCESS"
-        
-        if (Compare-Versions $currentVersion $minVersion) {
-            Write-Log "Ollama version is up to date" "SUCCESS"
-            Configure-OllamaSecurity
-            return
+    if (-not $SkipUpdate) {
+        if (-not (Test-Path $RepoDir)) {
+            git clone $repoUrl $RepoDir
         } else {
-            Write-Log "Ollama version $currentVersion is outdated" "WARNING"
-            
-            $isInteractive = [Environment]::UserInteractive -and ([Environment]::GetCommandLineArgs() -notcontains '-NonInteractive')
-            
-            if ($isInteractive -and -not $Silent) {
-                $updateChoice = Read-Host "Update Ollama to latest version? [Y/n]"
-                
-                if ($updateChoice -notmatch "^[Nn]") {
-                    Update-Ollama
-                } else {
-                    Write-Log "Continuing with outdated Ollama version" "WARNING"
-                }
+            if (-not (git -C $RepoDir status --porcelain 2>$null)) {
+                git -C $RepoDir pull --rebase 2>$null
             } else {
-                Write-Log "Auto-updating Ollama (non-interactive mode)..." "STEP"
-                Update-Ollama
+                Write-Host "[!] Repo is dirty; skipping git pull" -ForegroundColor Yellow
             }
         }
-    } else {
-        Write-Log "Ollama not found. Installing..." "STEP"
-        Install-OllamaInstaller
+    }
+
+    # Install backend dependencies
+    Write-Host "[*] Setting up Python environment..." -ForegroundColor Yellow
+    Push-Location "$RepoDir\backend"
+    & python -m venv venv
+    & ".\venv\Scripts\pip.exe" install --upgrade pip | Out-Null
+    & ".\venv\Scripts\pip.exe" install fastapi uvicorn pydantic httpx sqlalchemy python-multipart python-jose passlib | Out-Null
+    Pop-Location
+
+    # Install frontend dependencies
+    Write-Host "[*] Installing frontend dependencies..." -ForegroundColor Yellow
+    Push-Location "$RepoDir\frontend"
+    npm install --legacy-peer-deps 2>$null
+    Pop-Location
+
+    # Create wrapper script
+    $binDir = Join-Path $env:USERPROFILE ".local\bin"
+    if (-not (Test-Path $binDir)) {
+        New-Item -ItemType Directory -Force -Path $binDir | Out-Null
     }
     
-    Configure-OllamaSecurity
+    $cmdPath = Join-Path $binDir "closedpaw.cmd"
+    $cmdContents = "@echo off`r`nnode ""$RepoDir\bin\closedpaw.js"" %*`r`n"
+    Set-Content -Path $cmdPath -Value $cmdContents -NoNewline
+
+    # Add to PATH
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if (-not ($userPath -split ";" | Where-Object { $_ -ieq $binDir })) {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$binDir", "User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "[!] Added $binDir to user PATH" -ForegroundColor Yellow
+    }
+
+    Write-Host "[OK] ClosedPaw installed to $cmdPath" -ForegroundColor Green
 }
 
-function Update-Ollama {
-    $ollamaProcess = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
-    if ($ollamaProcess) {
-        Write-Log "Stopping Ollama..." "STEP"
-        Stop-Process -Name "ollama" -Force
-        Start-Sleep -Seconds 2
-    }
-    Install-OllamaInstaller
-    Write-Log "Ollama updated successfully" "SUCCESS"
-}
-
-function Install-OllamaInstaller {
-    try {
-        $ollamaUrl = "https://ollama.com/download/OllamaSetup.exe"
-        $ollamaInstaller = "$env:TEMP\OllamaSetup.exe"
-        
-        Write-Log "Downloading Ollama..." "STEP"
-        Invoke-WebRequest -Uri $ollamaUrl -OutFile $ollamaInstaller
-        
-        Write-Log "Installing Ollama..." "STEP"
-        Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
-        
-        Remove-Item $ollamaInstaller -ErrorAction SilentlyContinue
-    } catch {
-        Write-Log "Failed to install Ollama: $_" "ERROR"
-        exit 1
-    }
-}
-
-function Configure-OllamaSecurity {
-    Write-Log "Configuring Ollama security..." "STEP"
-    
-    $currentHost = [System.Environment]::GetEnvironmentVariable("OLLAMA_HOST", "User")
-    $currentOrigins = [System.Environment]::GetEnvironmentVariable("OLLAMA_ORIGINS", "User")
-    
-    $needsUpdate = $false
-    
-    if ($currentHost -ne "127.0.0.1:11434") {
-        [System.Environment]::SetEnvironmentVariable("OLLAMA_HOST", "127.0.0.1:11434", "User")
-        $needsUpdate = $true
-    }
-    
-    if ($currentOrigins -ne "*") {
-        [System.Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "*", "User")
-        $needsUpdate = $true
-    }
-    
-    if ($needsUpdate) {
-        Write-Log "Ollama security configuration applied" "SUCCESS"
-    } else {
-        Write-Log "Ollama security configuration is correct" "SUCCESS"
-    }
-}
-
-function Select-Models {
-    Write-Log "Model Selection (Optional)" "STEP"
-    
-    Write-Host ""
-    Write-Host "==============================================" -ForegroundColor Yellow
-    Write-Host "  MODEL DOWNLOAD IS OPTIONAL" -ForegroundColor Yellow
-    Write-Host "==============================================" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "ClosedPaw can work with local LLM models via Ollama."
-    Write-Host "Models are typically 2-8 GB in size."
-    Write-Host ""
-    
-    $isInteractive = [Environment]::UserInteractive -and ([Environment]::GetCommandLineArgs() -notcontains '-NonInteractive')
-    
-    if (-not $isInteractive -or $Silent) {
-        Write-Log "Skipping model download (non-interactive mode)" "WARNING"
-        Write-Host "You can download models later using: ollama pull llama3.2:3b"
-        return
-    }
-    
-    Write-Host "You have three options:"
-    Write-Host "  1. Download a recommended model now (requires internet)"
-    Write-Host "  2. Skip and download later manually"
-    Write-Host "  3. Use only cloud LLM providers (OpenAI, Anthropic, etc.)"
-    Write-Host ""
-    
-    $choice = Read-Host "Download model now? [Y/n/skip]"
-    
-    if ($choice -match "^[Nn]|^[Ss]") {
-        Write-Log "Skipping model download" "WARNING"
-        Write-Host ""
-        Write-Host "You can download models later using:"
-        Write-Host "  ollama pull llama3.2:3b"
-        return
-    }
-    
-    Write-Host ""
-    Write-Log "Recommended models:" "STEP"
-    Write-Host ""
-    Write-Host "  [1] llama3.2:3b - Fast, good for chat (Size: ~2GB)"
-    Write-Host "  [2] mistral:7b - Balance of speed and quality (Size: ~4GB)"
-    Write-Host "  [3] qwen2.5:7b - Excellent for code (Size: ~4GB)"
-    Write-Host ""
-    
-    $modelChoice = Read-Host "Select model [1-3] or 'skip' to cancel"
-    
-    if ($modelChoice -eq "skip") {
-        Write-Log "Skipping model download" "WARNING"
-        return
-    }
-    
-    switch ($modelChoice) {
-        "2" { $selectedModel = "mistral:7b" }
-        "3" { $selectedModel = "qwen2.5:7b" }
-        default { $selectedModel = "llama3.2:3b" }
-    }
-    
-    Write-Host ""
-    Write-Host "About to download: $selectedModel" -ForegroundColor Yellow
-    Write-Host "This may take several minutes depending on your internet speed."
-    Write-Host ""
-    
-    $confirm = Read-Host "Proceed with download? [Y/n]"
-    
-    if ($confirm -match "^[Nn]") {
-        Write-Log "Download cancelled" "WARNING"
-        return
-    }
-    
-    Write-Log "Downloading model: $selectedModel" "STEP"
-    Write-Host "This may take a while... Press Ctrl+C to cancel"
-    Write-Host ""
-    
-    try {
-        $ollamaPath = Get-OllamaPath
-        if (-not $ollamaPath) {
-            Write-Log "Ollama not found. Cannot download model." "ERROR"
-            return
-        }
-        
-        $ollamaProcess = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
-        if (-not $ollamaProcess) {
-            Start-Process -FilePath $ollamaPath -ArgumentList "serve" -WindowStyle Hidden
-            Start-Sleep -Seconds 3
-        }
-        
-        & $ollamaPath pull $selectedModel
-        
-        Write-Log "Model $selectedModel installed successfully!" "SUCCESS"
-    } catch {
-        Write-Log "Failed to download model: $_" "ERROR"
-        Write-Host "You can try again later with: ollama pull $selectedModel"
-    }
-}
-
+# Create directories
 function Initialize-Directories {
-    Write-Log "Setting up directories..." "STEP"
+    $dirs = @(
+        $GitDir,
+        "$env:USERPROFILE\.config\closedpaw"
+    )
     
-    New-Item -ItemType Directory -Force -Path $script:InstallDir | Out-Null
-    New-Item -ItemType Directory -Force -Path $script:ConfigDir | Out-Null
-    New-Item -ItemType Directory -Force -Path "$script:InstallDir\skills" | Out-Null
-    New-Item -ItemType Directory -Force -Path "$script:InstallDir\logs" | Out-Null
-    
-    Write-Log "Directories created" "SUCCESS"
-}
-
-function Clone-Repository {
-    Write-Log "Downloading ClosedPaw..." "STEP"
-    
-    if (Test-Path $script:InstallDir) {
-        $contents = Get-ChildItem $script:InstallDir
-        if ($contents) {
-            Write-Log "Directory exists, removing..." "WARNING"
-            Remove-Item -Path $script:InstallDir -Recurse -Force
+    foreach ($dir in $dirs) {
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
         }
     }
-    
-    git clone https://github.com/logansin/closedpaw.git $script:InstallDir
-    
-    Write-Log "ClosedPaw downloaded" "SUCCESS"
+    Write-Host "[OK] Directories created" -ForegroundColor Green
 }
 
-function New-EncryptionKey {
-    Write-Log "Generating encryption key..." "STEP"
-    
-    $encryptionKey = -join ((1..64) | ForEach-Object { '{0:X2}' -f (Get-Random -Maximum 256) })
-    $keyFile = "$script:ConfigDir\.encryption_key"
-    $encryptionKey | Out-File -FilePath $keyFile -Encoding UTF8
-    
-    $acl = Get-Acl $keyFile
-    $acl.SetAccessRuleProtection($true, $false)
-    
-    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($currentUser, "Read,Write", "Allow")
-    $acl.SetAccessRule($accessRule)
-    Set-Acl $keyFile $acl
-    
-    Write-Log "Encryption key generated and secured" "SUCCESS"
-}
-
-function Install-PythonDependencies {
-    Write-Log "Installing Python dependencies..." "STEP"
-    
-    Set-Location $script:InstallDir
-    
-    python -m venv venv
-    & ".\venv\Scripts\Activate.ps1"
-    
-    python -m pip install --upgrade pip
-    
-    $packages = @("fastapi", "uvicorn[standard]", "pydantic", "pydantic-ai", "httpx", "sqlalchemy", "python-multipart", "python-jose[cryptography]", "passlib[bcrypt]", "cryptography", "pynacl")
-    
-    foreach ($package in $packages) {
-        Write-Log "Installing $package..." "STEP"
-        pip install $package
-    }
-    
-    Write-Log "Python dependencies installed" "SUCCESS"
-}
-
-function Install-FrontendDependencies {
-    Write-Log "Installing frontend dependencies..." "STEP"
-    
-    Set-Location "$script:InstallDir\frontend"
-    
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        Write-Log "Node.js is required but not installed" "ERROR"
-        exit 1
-    }
-    
-    npm install
-    
-    Write-Log "Frontend dependencies installed" "SUCCESS"
-}
-
-function Build-Frontend {
-    Write-Log "Building frontend..." "STEP"
-    
-    Set-Location "$script:InstallDir\frontend"
-    npm run build
-    
-    Write-Log "Frontend built successfully" "SUCCESS"
-}
-
-function New-LauncherScript {
-    Write-Log "Creating launcher script..." "STEP"
-    
-    $ollamaPath = Get-OllamaPath
-    if (-not $ollamaPath) {
-        $ollamaPath = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
-    }
-    
-    $launcherContent = @"
-# ClosedPaw Launcher
-`$INSTALL_DIR = `"$env:USERPROFILE\.closedpaw`"
-Set-Location `$INSTALL_DIR
-& `".\venv\Scripts\Activate.ps1`"
-
-`$ollamaRunning = Test-NetConnection -ComputerName 127.0.0.1 -Port 11434 -WarningAction SilentlyContinue
-if (-not `$ollamaRunning.TcpTestSucceeded) {
-    Write-Host `"Starting Ollama...`"
-    Start-Process -FilePath `"$ollamaPath`" -ArgumentList `"serve`" -WindowStyle Hidden
-    Start-Sleep -Seconds 3
-}
-
-Write-Host `"Starting ClosedPaw backend...`"
-Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.closedpaw\backend'; ..\venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000`" -WindowStyle Normal
-
-Write-Host `"Starting Web UI...`"
-Start-Process powershell -ArgumentList `"-Command`", `"cd '$env:USERPROFILE\.closedpaw\frontend'; npm run dev`" -WindowStyle Normal
-
-Write-Host "ClosedPaw is running!"
-Write-Host `"Web UI: http://localhost:3000`"
-Write-Host `"API: http://localhost:8000`"
-"@
-    
-    $launcherPath = $script:InstallDir + "\closedpaw.ps1"
-    $launcherContent | Out-File -FilePath $launcherPath -Encoding UTF8
-    
-    $batchContent = "@echo off`npowershell -ExecutionPolicy Bypass -File `"%USERPROFILE%\.closedpaw\closedpaw.ps1`""
-    $batchPath = $script:InstallDir + "\closedpaw.bat"
-    $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
-    
-    $currentPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
-    if ($currentPath -notlike "*" + $script:InstallDir + "*") {
-        [System.Environment]::SetEnvironmentVariable('Path', $currentPath + ";" + $script:InstallDir, 'User')
-    }
-    
-    Write-Log "Launcher created" "SUCCESS"
-}
-
-function Write-CompletionMessage {
+# Print success message
+function Print-Success {
     Write-Host ""
     Write-Host "==============================================" -ForegroundColor Green
-    Write-Host "   ClosedPaw Installation Complete!          " -ForegroundColor Green
+    Write-Host "  ClosedPaw Installation Complete!" -ForegroundColor Green
     Write-Host "==============================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "Quick Start:" -ForegroundColor Cyan
-    Write-Host "  - Restart PowerShell session"
-    Write-Host "  - Start anytime: closedpaw.bat"
-    Write-Host "  - Web UI: http://localhost:3000"
-    Write-Host "  - API: http://localhost:8000"
+    Write-Host "  closedpaw start     " -NoNewline; Write-Host "# Start the assistant" -ForegroundColor Gray
+    Write-Host "  closedpaw chat ""Hi""" -NoNewline; Write-Host " # Quick chat" -ForegroundColor Gray
+    Write-Host "  closedpaw doctor    " -NoNewline; Write-Host "# Run diagnostics" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Installation log: $script:LogFile" -ForegroundColor Cyan
+    Write-Host "Web UI: " -NoNewline; Write-Host "http://localhost:3000" -ForegroundColor Cyan
+    Write-Host "API:    " -NoNewline; Write-Host "http://localhost:8000" -ForegroundColor Cyan
+    Write-Host ""
 }
 
-function Open-Browser {
-    Write-Log "Opening browser..." "STEP"
-    Start-Sleep -Seconds 2
-    
-    try {
-        Start-Process "http://localhost:3000"
-    } catch {
-        Write-Log "Could not open browser automatically" "WARNING"
-        Write-Host "Please open http://localhost:3000 manually"
-    }
-}
-
+# Main installation flow
 function Main {
-    Print-Banner
-    
-    Write-Host "Installing ClosedPaw on your system..." -ForegroundColor Yellow
-    
-    Select-InstallLocation
-    Get-OSInfo
-    Test-Dependencies
-    Install-Ollama
+    # Check dependencies
+    $python = Check-Python
+    if (-not $python) {
+        Install-Python
+        $python = Check-Python
+        if (-not $python) {
+            Write-Host "[!] Python installation failed. Please install manually." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    $nodeOk = Check-Node
+    if (-not $nodeOk) {
+        Install-Node
+        $nodeOk = Check-Node
+        if (-not $nodeOk) {
+            Write-Host "[!] Node.js installation failed. Please install manually." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    if ($InstallMethod -eq "git") {
+        if (-not (Check-Git)) {
+            Write-Host "[!] Git is required for git install method" -ForegroundColor Red
+            Write-Host "    Install from: https://git-scm.com" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+
+    # Check Ollama (optional)
+    $ollama = Check-Ollama
+    if (-not $ollama) {
+        Write-Host "[*] Ollama is optional but recommended for local LLM" -ForegroundColor Yellow
+        $install = Read-Host "Install Ollama? [Y/n]"
+        if ($install -notmatch "^[Nn]") {
+            Install-Ollama
+        }
+    }
+
+    # Initialize directories
     Initialize-Directories
-    New-EncryptionKey
-    Clone-Repository
-    Install-PythonDependencies
-    Install-FrontendDependencies
-    Build-Frontend
-    Select-Models
-    New-LauncherScript
-    
-    Write-CompletionMessage
-    
-    Write-Host ""
-    Write-Log "Starting ClosedPaw..." "STEP"
-    Start-Process -FilePath "$script:InstallDir\closedpaw.bat" -WindowStyle Normal
-    Start-Sleep -Seconds 3
-    Open-Browser
+
+    # Install ClosedPaw
+    if ($DryRun) {
+        Write-Host "[DRY RUN] Would install ClosedPaw via $InstallMethod" -ForegroundColor Yellow
+    } else {
+        if ($InstallMethod -eq "npm") {
+            Install-ClosedPaw
+        } else {
+            Install-ClosedPawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate
+        }
+    }
+
+    # Ensure on PATH
+    Ensure-ClosedPawOnPath
+
+    # Success
+    Print-Success
 }
 
+# Run main
 Main
