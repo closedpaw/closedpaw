@@ -4,7 +4,6 @@ Central component managing all system operations with Zero-Trust architecture
 """
 
 import asyncio
-import json
 import logging
 import os
 import tempfile

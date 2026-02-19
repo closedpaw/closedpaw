@@ -257,7 +257,7 @@ class AgentManager:
         await start_result.communicate()
         
         if start_result.returncode != 0:
-            raise RuntimeError(f"gVisor container start failed")
+            raise RuntimeError("gVisor container start failed")
     
     async def _create_kata_sandbox(self, agent: AgentInstance):
         """Create Kata Containers sandbox"""

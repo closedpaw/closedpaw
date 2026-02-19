@@ -6,7 +6,7 @@ Based on lessons from OpenClaw CVE-2026-25253
 
 import re
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime

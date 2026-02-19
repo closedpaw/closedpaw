@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.core.orchestrator import get_orchestrator, ActionType, SecurityLevel, SystemAction
+from app.core.orchestrator import get_orchestrator, ActionType, SecurityLevel
 from app.core.providers import get_provider_manager, ProviderType, ChatMessage
 from app.core.channels import get_channel_manager, ChannelType
 
@@ -199,7 +199,7 @@ async def get_models():
                         size=str(model.get("size", "unknown")),
                         parameters="unknown"
                     ))
-    except Exception as e:
+    except Exception:
         # Return default models if Ollama is not available
         models = [
             ModelInfo(name="llama3.2:3b", description="Fast, good for chat", size="2GB", parameters="3B"),

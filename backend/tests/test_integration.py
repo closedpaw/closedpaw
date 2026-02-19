@@ -6,7 +6,6 @@ Tests the full system integration with Ollama
 import pytest
 import asyncio
 import httpx
-import sys
 import os
 
 # Test configuration

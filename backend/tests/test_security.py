@@ -4,7 +4,6 @@ Tests for prompt injection, access control, and data protection
 """
 
 import pytest
-import asyncio
 import sys
 import os
 

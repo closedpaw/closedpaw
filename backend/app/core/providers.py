@@ -3,14 +3,12 @@ ClosedPaw - Multi-Provider LLM Gateway
 Supports Ollama, OpenAI, Anthropic, Google, Mistral, and custom endpoints
 """
 
-import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, AsyncGenerator
+from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
-import json
 
 import httpx
 
@@ -156,7 +154,7 @@ class OllamaProvider(BaseProvider):
         try:
             response = await self.client.get(f"{self.config.base_url}/api/tags", timeout=5.0)
             return response.status_code == 200
-        except:
+        except Exception:
             return False
 
 
@@ -498,7 +496,7 @@ class ProviderManager:
         for name, provider in self.providers.items():
             try:
                 result[name] = await provider.health_check()
-            except:
+            except Exception:
                 result[name] = False
         return result
     
