@@ -288,22 +288,28 @@ check_and_install_sandbox() {
 }
 
 detect_hardware() {
-    print_step "Detecting hardware with LLM Checker..."
+    print_step "Detecting hardware capabilities..."
     
-    # Install LLM Checker if not present
-    if ! command -v llm-checker &> /dev/null; then
-        print_step "Installing LLM Checker..."
-        npm install -g llm-checker
+    # Try to use LLM Checker if available, otherwise use basic detection
+    if command -v llm-checker &> /dev/null; then
+        print_step "Using LLM Checker for hardware detection..."
+        
+        # Run hardware detection
+        HW_INFO=$(llm-checker hw-detect --json 2>/dev/null || echo '{}')
+        
+        # Parse hardware info
+        CPU=$(echo "$HW_INFO" | grep -o '"cpu": "[^"]*"' | cut -d'"' -f4 || echo "Unknown")
+        RAM=$(echo "$HW_INFO" | grep -o '"ram": "[^"]*"' | cut -d'"' -f4 || echo "Unknown")
+        GPU=$(echo "$HW_INFO" | grep -o '"gpu": "[^"]*"' | cut -d'"' -f4 || echo "None")
+        BACKEND=$(echo "$HW_INFO" | grep -o '"backend": "[^"]*"' | cut -d'"' -f4 || echo "CPU")
+    else
+        # Basic hardware detection without llm-checker
+        print_step "LLM Checker not available, using basic detection..."
+        CPU=$(uname -m)
+        RAM=$(free -h 2>/dev/null | awk '/^Mem:/ {print $2}' || echo "Unknown")
+        GPU="Unknown"
+        BACKEND="CPU"
     fi
-    
-    # Run hardware detection
-    HW_INFO=$(llm-checker hw-detect --json 2>/dev/null || echo '{}')
-    
-    # Parse hardware info
-    CPU=$(echo "$HW_INFO" | grep -o '"cpu": "[^"]*"' | cut -d'"' -f4 || echo "Unknown")
-    RAM=$(echo "$HW_INFO" | grep -o '"ram": "[^"]*"' | cut -d'"' -f4 || echo "Unknown")
-    GPU=$(echo "$HW_INFO" | grep -o '"gpu": "[^"]*"' | cut -d'"' -f4 || echo "None")
-    BACKEND=$(echo "$HW_INFO" | grep -o '"backend": "[^"]*"' | cut -d'"' -f4 || echo "CPU")
     
     echo -e "${GREEN}Hardware detected:${NC}"
     echo "  CPU: $CPU"

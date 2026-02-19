@@ -292,8 +292,15 @@ function Install-Sandbox {
     
     if ($inWSL) {
         Write-Host "  Configuring WSL2 for gVisor..." -ForegroundColor Gray
-        # gVisor can be installed in WSL2
-        wsl -d Ubuntu -e bash -c "curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg && echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main' | sudo tee /etc/apt/sources.list.d/gvisor.list && sudo apt-get update && sudo apt-get install -y runsc"
+        # gVisor can be installed in WSL2 - break into multiple commands for readability
+        $gvisorScript = @'
+set -e
+curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list
+sudo apt-get update -qq
+sudo apt-get install -y runsc
+'@
+        wsl -d Ubuntu -e bash -c $gvisorScript
         Write-Host "[OK] gVisor installed in WSL2" -ForegroundColor Green
     } else {
         Write-Host "  Docker Desktop detected, configuring..." -ForegroundColor Gray
