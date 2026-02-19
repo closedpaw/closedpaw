@@ -59,10 +59,10 @@ class PromptInjectionDefender:
         ],
         "delimiter_manipulation": [
             r"```\s*\n.*?(ignore|disregard|bypass).*?```",
-            r"<\|.*?>.*?(",
+            r"<\|.*?>.*?(ignore|disregard)",
             r"\[SYSTEM\].*?",
             r"\[INSTRUCTION\].*?",
-            r"<<<.*?>>>.*?(",
+            r"<<<.*?>>>.*?(ignore|override)",
         ],
         "encoding_obfuscation": [
             r"base64\s*[:\(].*?\)",

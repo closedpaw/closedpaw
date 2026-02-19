@@ -83,6 +83,15 @@ class SystemAction(BaseModel):
     error: Optional[str] = None
 
 
+class ActionValidationResult(BaseModel):
+    """Result of action validation"""
+    is_valid: bool = True
+    requires_approval: bool = False
+    security_level: str = "medium"
+    action_type: str = "unknown"
+    reason: Optional[str] = None
+
+
 class CoreOrchestrator:
     """
     Core Orchestrator for ClosedPaw
@@ -246,6 +255,46 @@ class CoreOrchestrator:
             return SecurityLevel.LOW
         
         return SecurityLevel.MEDIUM
+    
+    async def validate_action(self, action: Dict[str, Any]) -> "ActionValidationResult":
+        """
+        Validate an action and determine if it requires approval
+        
+        Args:
+            action: Dictionary with action details (type, path, etc.)
+            
+        Returns:
+            ActionValidationResult with validation details
+        """
+        action_type_str = action.get("type", "unknown")
+        
+        # Map action type strings to ActionType enum
+        type_mapping = {
+            "read": ActionType.FILE_OPERATION,
+            "write": ActionType.FILE_OPERATION,
+            "delete": ActionType.FILE_OPERATION,
+            "calculate": ActionType.CHAT,
+            "search": ActionType.CHAT,
+            "chat": ActionType.CHAT,
+            "skill": ActionType.SKILL_EXECUTION,
+            "config": ActionType.CONFIG_CHANGE,
+            "api": ActionType.API_CALL,
+        }
+        
+        action_type = type_mapping.get(action_type_str, ActionType.CHAT)
+        
+        # Determine security level
+        security_level = self._determine_security_level(action_type, action)
+        
+        # Check if approval is required
+        requires_approval = security_level in [SecurityLevel.HIGH, SecurityLevel.CRITICAL]
+        
+        return ActionValidationResult(
+            is_valid=True,
+            requires_approval=requires_approval,
+            security_level=security_level.value,
+            action_type=action_type.value
+        )
     
     async def _execute_action(self, action_id: str):
         """Execute an approved action"""

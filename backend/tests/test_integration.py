@@ -4,6 +4,7 @@ Tests the full system integration with Ollama
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import httpx
 import os
@@ -13,7 +14,7 @@ API_BASE = os.getenv("API_BASE", "http://127.0.0.1:8000")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     """HTTP client for API testing"""
     async with httpx.AsyncClient(timeout=30.0) as client:
