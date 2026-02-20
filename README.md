@@ -12,6 +12,8 @@
 
 ClosedPaw is a privacy-focused AI assistant that runs entirely on your local machine. Unlike cloud-based solutions, your data never leaves your device. Built with security-first architecture using gVisor/Kata Containers for true isolation.
 
+**📚 [Documentation & Wiki](https://github.com/logansin/closedpaw/tree/main/.qoder/repowiki/en/content)** — Comprehensive guides, API reference, and security deep-dives.
+
 ## 🚀 Quick Start
 
 ### Recommended Platform
@@ -66,11 +68,35 @@ npm run dev  # Starts both backend and frontend
 
 - **Zero-Trust Architecture** - No implicit trust, all actions verified
 - **Hardened Sandboxing** - gVisor/Kata Containers (not just Docker)
-- **Prompt Injection Defense** - Protection against CVE-2026-25253 type attacks
+- **Prompt Injection Defense** - Protection against CVE-2026-25253 type attacks with multi-layer pattern detection
 - **Local-Only Operation** - Ollama on 127.0.0.1, Web UI on localhost
 - **Human-in-the-Loop** - Critical actions require approval
 - **Audit Logging** - All actions logged for forensic analysis
 - **Encrypted Storage** - API keys encrypted at rest
+
+## 🧪 Testing & Quality
+
+ClosedPaw maintains high code quality through comprehensive testing:
+
+| Tool | Purpose | Coverage |
+|------|---------|----------|
+| **pytest** | Unit & integration tests | 19+ passing tests |
+| **pytest-asyncio** | Async test support | Full async coverage |
+| **ruff** | Python linting | Zero errors |
+| **bandit** | Security scanning | Zero issues |
+| **coverage** | Code coverage tracking | HTML + XML reports |
+
+```bash
+# Run tests locally
+cd backend
+pytest tests/ -v --cov=app --cov-report=html
+
+# Run linting
+ruff check backend/
+
+# Run security scan
+bandit -r backend/app/
+```
 
 ## 🛡️ Security Reality Check
 
@@ -127,9 +153,6 @@ Package Size Breakdown:
 | "Lightweight" AI tools | 5-10 MB | ❌ None | ❌ No | ❌ No |
 | OpenClaw | ~50 MB | ⚠️ Docker only | ❌ No | ⚠️ Partial |
 | **ClosedPaw** | **112 MB** | **✅ gVisor/Kata** | **✅ Yes** | **✅ Full** |
-- **Human-in-the-Loop** - Critical actions require approval
-- **Audit Logging** - All actions logged for forensic analysis
-- **Encrypted Storage** - API keys encrypted at rest
 
 ## 🏗️ Architecture
 

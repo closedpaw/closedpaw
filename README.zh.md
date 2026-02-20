@@ -9,6 +9,8 @@
 
 ClosedPaw 是一款注重隐私的 AI 助手，完全在您的本地计算机上运行。与云解决方案不同，您的数据永远不会离开您的设备。采用安全优先架构构建，使用 gVisor/Kata Containers 实现真正的隔离。
 
+**📚 [文档与 Wiki](https://github.com/logansin/closedpaw/tree/main/.qoder/repowiki/en/content)** — 全面指南、API 参考和安全深度解析。
+
 ## 🚀 快速开始
 
 ### 推荐平台
@@ -63,11 +65,35 @@ npm run dev  # 同时启动后端和前端
 
 - **零信任架构** — 没有隐式信任，所有操作都经过验证
 - **强化沙箱** — gVisor/Kata Containers（不仅仅是 Docker）
-- **提示注入防护** — 防御 CVE-2026-25253 类型的攻击
+- **提示注入防护** — 防御 CVE-2026-25253 类型的攻击，采用多层模式检测
 - **纯本地运行** — Ollama 绑定到 127.0.0.1，Web UI 在 localhost
 - **人工介入 (HITL)** — 关键操作需要用户确认
 - **审计日志** — 所有操作都记录用于取证分析
 - **加密存储** — API 密钥在静态时加密
+
+## 🧪 测试与质量
+
+ClosedPaw 通过全面的测试保持高代码质量：
+
+| 工具 | 用途 | 覆盖率 |
+|------|------|--------|
+| **pytest** | 单元和集成测试 | 19+ 通过测试 |
+| **pytest-asyncio** | 异步测试支持 | 完整异步覆盖 |
+| **ruff** | Python 代码检查 | 零错误 |
+| **bandit** | 安全扫描 | 零问题 |
+| **coverage** | 代码覆盖率跟踪 | HTML + XML 报告 |
+
+```bash
+# 本地运行测试
+cd backend
+pytest tests/ -v --cov=app --cov-report=html
+
+# 运行代码检查
+ruff check backend/
+
+# 运行安全扫描
+bandit -r backend/app/
+```
 
 ## 🛡️ 安全现实检查
 
