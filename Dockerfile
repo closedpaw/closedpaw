@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Backend Builder
 # ============================================
-FROM python:3.11-slim as backend-builder
+FROM python:3.11-slim AS backend-builder
 
 WORKDIR /app/backend
 
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # ============================================
 # Stage 2: Frontend Builder
 # ============================================
-FROM node:20-alpine as frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -35,7 +35,7 @@ RUN npm run build
 # ============================================
 # Stage 3: Production Image
 # ============================================
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 # Security: Create non-root user
 RUN groupadd -r closedpaw && useradd -r -g closedpaw closedpaw
