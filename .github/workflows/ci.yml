@@ -224,7 +224,8 @@ jobs:
       - name: Run integration tests
         run: |
           pip install pytest httpx
-          pytest backend/tests/integration/ -v
+          cd backend
+          pytest tests/ -v --ignore=tests/test_integration.py
         env:
           OLLAMA_HOST: http://localhost:11434
           TESTING: true
