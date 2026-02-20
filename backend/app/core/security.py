@@ -42,11 +42,13 @@ class PromptInjectionDefender:
     # Known injection patterns (based on CVE-2026-25253 and research)
     INJECTION_PATTERNS = {
         "instruction_override": [
-            r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|commands?|prompts?)",
-            r"disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|commands?|prompts?)",
-            r"forget\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|commands?|prompts?)",
-            r"override\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|commands?|prompts?)",
-            r"bypass\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|commands?|prompts?)",
+            r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
+            r"disregard\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
+            r"forget\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
+            r"override\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
+            r"bypass\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
+            r"new\s+instructions?:",
+            r"end\s+of\s+prompt",
         ],
         "role_manipulation": [
             r"act\s+as\s+(if\s+)?you\s+(are|were)",
@@ -56,6 +58,7 @@ class PromptInjectionDefender:
             r"from\s+now\s+on\s+you\s+are\s+",
             r"switch\s+to\s+\w+\s+mode",
             r"enter\s+\w+\s+mode",
+            r"system\s*:",
         ],
         "delimiter_manipulation": [
             r"```\s*\n.*?(ignore|disregard|bypass).*?```",
@@ -566,6 +569,7 @@ class SecurityManager:
         r"import\s+os",
         r"import\s+subprocess",
         r"import\s+socket",
+        r"subprocess\.",
         r"exec\s*\(",
         r"eval\s*\(",
         r"__import__",
@@ -776,13 +780,24 @@ class SecurityManager:
         # Normalize
         normalized = os.path.normpath(decoded)
         
-        # Remove leading ..
-        while normalized.startswith(".."):
-            normalized = normalized[2:]
-            if normalized.startswith("/"):
+        # Remove leading .. and any remaining directory traversals
+        while normalized.startswith("..") or normalized.startswith("/"):
+            if normalized.startswith(".."):
+                normalized = normalized[2:]
+                if normalized.startswith("/"):
+                    normalized = normalized[1:]
+            elif normalized.startswith("/"):
                 normalized = normalized[1:]
         
-        return normalized
+        # Remove any remaining .. patterns
+        while ".." in normalized:
+            normalized = normalized.replace("..", "")
+        
+        # Clean up any double slashes or backslashes
+        normalized = normalized.replace("\\\\", "/").replace("\\", "/")
+        normalized = normalized.replace("//", "/")
+        
+        return normalized.strip("/") or "safe_path"
     
     def sanitize_error(self, error: Exception) -> str:
         """Sanitize error message for safe logging"""
@@ -790,11 +805,12 @@ class SecurityManager:
         
         # Patterns to redact
         patterns = [
-            (r'sk-[a-zA-Z0-9]{20,}', '[REDACTED_API_KEY]'),
-            (r'password[=:]\s*\S+', 'password=[REDACTED]'),
-            (r'token[=:]\s*\S+', 'token=[REDACTED]'),
-            (r'secret[=:]\s*\S+', 'secret=[REDACTED]'),
-            (r'key[=:]\s*\S+', 'key=[REDACTED]'),
+            (r'sk-[a-zA-Z0-9]{8,}', '[REDACTED_API_KEY]'),
+            (r'password[=:\s]+\S+', 'password=[REDACTED]'),
+            (r'pass[=:\s]+\S+', 'pass=[REDACTED]'),
+            (r'token[=:\s]+\S+', 'token=[REDACTED]'),
+            (r'secret[=:\s]+\S+', 'secret=[REDACTED]'),
+            (r'key[=:\s]+\S+', 'key=[REDACTED]'),
         ]
         
         import re

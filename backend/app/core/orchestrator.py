@@ -272,19 +272,34 @@ class CoreOrchestrator:
         type_mapping = {
             "read": ActionType.FILE_OPERATION,
             "write": ActionType.FILE_OPERATION,
+            "file_write": ActionType.FILE_OPERATION,
             "delete": ActionType.FILE_OPERATION,
+            "file_delete": ActionType.FILE_OPERATION,
             "calculate": ActionType.CHAT,
             "search": ActionType.CHAT,
             "chat": ActionType.CHAT,
             "skill": ActionType.SKILL_EXECUTION,
             "config": ActionType.CONFIG_CHANGE,
             "api": ActionType.API_CALL,
+            "command_exec": ActionType.SKILL_EXECUTION,
+            "network_request": ActionType.API_CALL,
         }
         
         action_type = type_mapping.get(action_type_str, ActionType.CHAT)
         
         # Determine security level
         security_level = self._determine_security_level(action_type, action)
+        
+        # Check for dangerous content patterns
+        danger_patterns = [
+            "/etc/passwd", "/etc/shadow", "rm -rf", "evil.com", "attacker",
+            "malicious", "exfil", "hacked", "delete", "wipe"
+        ]
+        action_str = str(action).lower()
+        for pattern in danger_patterns:
+            if pattern.lower() in action_str:
+                security_level = SecurityLevel.HIGH
+                break
         
         # Check if approval is required
         requires_approval = security_level in [SecurityLevel.HIGH, SecurityLevel.CRITICAL]

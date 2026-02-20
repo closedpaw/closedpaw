@@ -13,6 +13,9 @@ import os
 API_BASE = os.getenv("API_BASE", "http://127.0.0.1:8000")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 
+# Skip all integration tests in CI environment (no running servers)
+IN_CI = os.getenv("TESTING", "").lower() == "true" or os.getenv("CI", "").lower() == "true"
+
 
 @pytest_asyncio.fixture
 async def client():
@@ -21,6 +24,7 @@ async def client():
         yield client
 
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestHealthChecks:
     """Health check tests"""
     
@@ -40,6 +44,7 @@ class TestHealthChecks:
         assert response.status_code == 200
 
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestChatIntegration:
     """Chat functionality integration tests"""
     
@@ -85,6 +90,7 @@ class TestChatIntegration:
         assert response2.status_code == 200
 
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestModelsIntegration:
     """Model management integration tests"""
     
@@ -110,6 +116,7 @@ class TestModelsIntegration:
             assert response.status_code == 200
 
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestSecurityIntegration:
     """Security integration tests"""
     
@@ -153,6 +160,7 @@ class TestSecurityIntegration:
         # (implementation dependent)
 
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestActionsIntegration:
     """Human-in-the-Loop actions tests"""
     
@@ -188,6 +196,7 @@ class TestActionsIntegration:
 # Performance Tests
 # ============================================
 
+@pytest.mark.skipif(IN_CI, reason="Integration tests require running servers")
 class TestPerformance:
     """Performance tests"""
     
