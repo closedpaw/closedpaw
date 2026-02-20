@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List, Optional
 from enum import Enum
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -376,7 +376,7 @@ class DataVault:
             self.vault[key] = {
                 "data": encrypted,
                 "access_level": access_level,
-                "stored_at": datetime.utcnow().isoformat()
+                "stored_at": datetime.now(timezone.utc).isoformat()
             }
             
             self._log_access("store", key, access_level)
@@ -436,7 +436,7 @@ class DataVault:
     def _log_access(self, action: str, key: str, level: str):
         """Log vault access"""
         self.access_log.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "action": action,
             "key": key,
             "access_level": level

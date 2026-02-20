@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -70,7 +70,7 @@ class BaseProvider(ABC):
         self.config = config
         self.client = httpx.AsyncClient(timeout=config.timeout)
         self._request_count = 0
-        self._last_request_time = datetime.utcnow()
+        self._last_request_time = datetime.now(timezone.utc)
     
     @abstractmethod
     async def chat(
@@ -111,7 +111,7 @@ class OllamaProvider(BaseProvider):
         **kwargs
     ) -> ChatResponse:
         model = model or self.config.default_model or "llama3.2:3b"
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Convert messages to Ollama format
         prompt = "\n".join([f"{m.role}: {m.content}" for m in messages])
@@ -130,7 +130,7 @@ class OllamaProvider(BaseProvider):
             raise Exception(f"Ollama error: {response.status_code}")
         
         data = response.json()
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         
         return ChatResponse(
             content=data.get("response", ""),
@@ -180,7 +180,7 @@ class OpenAIProvider(BaseProvider):
             raise Exception("OpenAI API key not configured")
         
         model = model or self.config.default_model or "gpt-4o-mini"
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         response = await self.client.post(
             f"{self.config.base_url}/chat/completions",
@@ -200,7 +200,7 @@ class OpenAIProvider(BaseProvider):
             raise Exception(f"OpenAI error: {error}")
         
         data = response.json()
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         choice = data.get("choices", [{}])[0]
         
         return ChatResponse(
@@ -242,7 +242,7 @@ class AnthropicProvider(BaseProvider):
             raise Exception("Anthropic API key not configured")
         
         model = model or self.config.default_model or "claude-3-5-sonnet-20241022"
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Separate system message from other messages
         system_prompt = ""
@@ -273,7 +273,7 @@ class AnthropicProvider(BaseProvider):
             raise Exception(f"Anthropic error: {error}")
         
         data = response.json()
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         
         return ChatResponse(
             content=data.get("content", [{}])[0].get("text", ""),
@@ -310,7 +310,7 @@ class GoogleProvider(BaseProvider):
             raise Exception("Google API key not configured")
         
         model = model or self.config.default_model or "gemini-1.5-flash"
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Convert to Gemini format
         contents = []
@@ -333,7 +333,7 @@ class GoogleProvider(BaseProvider):
             raise Exception(f"Google error: {error}")
         
         data = response.json()
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         
         text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
         
@@ -374,7 +374,7 @@ class MistralProvider(BaseProvider):
             raise Exception("Mistral API key not configured")
         
         model = model or self.config.default_model or "mistral-small-latest"
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         response = await self.client.post(
             f"{self.config.base_url}/chat/completions",
@@ -394,7 +394,7 @@ class MistralProvider(BaseProvider):
             raise Exception(f"Mistral error: {error}")
         
         data = response.json()
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         choice = data.get("choices", [{}])[0]
         
         return ChatResponse(

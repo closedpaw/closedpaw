@@ -28,7 +28,8 @@ class TestLLMProvider:
         
         if models:
             # Should be able to select first model
-            selected = await provider.select_model(models[0]["name"])
+            model_name = models[0].name if hasattr(models[0], 'name') else models[0]["name"]
+            selected = await provider.select_model(model_name)
             assert selected is True
     
     @pytest.mark.asyncio
