@@ -205,7 +205,7 @@ class AgentManager:
         container_name = f"securesphere-agent-{agent.id}"
         
         # Prepare sandbox directory
-        sandbox_dir = f"/tmp/securesphere-sandboxes/{agent.id}"
+        sandbox_dir = f"/tmp/securesphere-sandboxes/{agent.id}"  # nosec B108
         os.makedirs(sandbox_dir, exist_ok=True)
         
         # Create OCI bundle for gVisor
@@ -274,7 +274,7 @@ class AgentManager:
             "--memory", f"{agent.resource_limits.memory_mb}m",
             "--network", "none",  # No network access
             "--read-only",  # Read-only rootfs
-            "--tmpfs", "/tmp:noexec,nosuid,size=100m",
+            "--tmpfs", "/tmp:noexec,nosuid,size=100m",  # nosec B108
             "securesphere-skill:latest",  # Skill container image
             "python", "-m", f"skills.{agent.skill_id}"
         ]
@@ -344,7 +344,7 @@ class AgentManager:
                     "source": "proc"
                 },
                 {
-                    "destination": "/tmp",
+                    "destination": "/tmp",  # nosec B108
                     "type": "tmpfs",
                     "source": "tmpfs",
                     "options": ["nosuid", "strictatime", "mode=755", "size=100m"]

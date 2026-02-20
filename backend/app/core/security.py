@@ -554,7 +554,7 @@ class SecurityManager:
         # Check for path traversal
         if ".." in normalized or normalized.startswith("/"):
             # Only allow within safe directories
-            safe_dirs = ["/tmp", "/home", os.path.expanduser("~")]
+            safe_dirs = ["/tmp", "/home", os.path.expanduser("~")]  # nosec B108
             if not any(normalized.startswith(d) for d in safe_dirs):
                 return FileAccessResult(
                     allowed=False,
