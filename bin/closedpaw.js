@@ -161,7 +161,7 @@ async function installClosedPaw(options) {
     await execa('git', [
       'clone',
       '--depth', '1',
-      'https://github.com/logansin/closedpaw.git',
+      'https://github.com/closedpaw/closedpaw.git',
       INSTALL_DIR
     ], { stdio: 'pipe' });
     cloneSpinner.succeed('ClosedPaw downloaded');
@@ -680,7 +680,7 @@ async function configureChannels() {
 program
   .name('closedpaw')
   .description('Zero-Trust AI Assistant with Hardened Sandboxing')
-  .version('1.0.0');
+  .version('1.1.1');
 
 program
   .command('install')

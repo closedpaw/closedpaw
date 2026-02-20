@@ -9,7 +9,7 @@
 
 ClosedPaw 是一款注重隐私的 AI 助手，完全在您的本地计算机上运行。与云解决方案不同，您的数据永远不会离开您的设备。采用安全优先架构构建，使用 gVisor/Kata Containers 实现真正的隔离。
 
-**📚 [文档与 Wiki](https://github.com/logansin/closedpaw/tree/main/.qoder/repowiki/en/content)** — 全面指南、API 参考和安全深度解析。
+**📚 [文档与 Wiki](https://github.com/closedpaw/closedpaw/tree/main/.qoder/repowiki/en/content)** — 全面指南、API 参考和安全深度解析。
 
 ## 🚀 快速开始
 
@@ -32,21 +32,21 @@ npm install -g closedpaw
 
 **Linux / macOS（推荐）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.sh | bash
 ```
 
 **Windows (PowerShell)：**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1 | iex
 ```
 
 ### 手动安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/logansin/closedpaw.git
+git clone https://github.com/closedpaw/closedpaw.git
 cd closedpaw
-
+```
 # 安装后端
 cd backend
 python -m venv venv
@@ -180,13 +180,13 @@ ClosedPaw 实现**纵深防御** — 多个重叠的安全层：
 
 ```bash
 # 拉取最新镜像
-docker pull ghcr.io/logansin/closedpaw:latest
+docker pull ghcr.io/closedpaw/closedpaw:latest
 
 # 运行并连接 Ollama
 docker run -d \
   -p 3000:3000 -p 8000:8000 \
   -e OLLAMA_HOST=host.docker.internal:11434 \
-  ghcr.io/logansin/closedpaw:latest
+  ghcr.io/closedpaw/closedpaw:latest
 ```
 
 可用标签：
@@ -194,7 +194,7 @@ docker run -d \
 - `main` — main 分支的最新构建
 - 特定版本标签（如 `1.1.1`）
 
-📦 [在 GitHub 上查看包](https://github.com/logansin/closedpaw/pkgs/container/closedpaw)
+📦 [在 GitHub 上查看包](https://github.com/closedpaw/closedpaw/pkgs/container/closedpaw)
 
 ## 🛠️ 技术栈
 

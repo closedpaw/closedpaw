@@ -1,6 +1,6 @@
 # ClosedPaw Installer for Windows
-# Usage: iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
-#        & ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1))) -Tag beta -DryRun
+# Usage: iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1 | iex
+#        & ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1))) -Tag beta -DryRun
 
 param(
     [string]$Tag = "latest",
@@ -422,7 +422,7 @@ function Install-ClosedPawFromGit {
         [switch]$SkipUpdate
     )
     
-    $repoUrl = "https://github.com/logansin/closedpaw.git"
+    $repoUrl = "https://github.com/closedpaw/closedpaw.git"
     Write-Host "[*] Installing ClosedPaw from GitHub ($repoUrl)..." -ForegroundColor Yellow
 
     if (-not $SkipUpdate) {

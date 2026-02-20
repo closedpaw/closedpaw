@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ClosedPaw Installer
-# One-command installation: curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
+# One-command installation: curl -sSL https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.sh | bash
 
 set -e
 
@@ -27,7 +27,7 @@ LOG_FILE=""
 # Logging setup (will be reinitialized after temp dir selection)
 setup_logging() {
     if [ -n "$TEMP_DIR" ]; then
-        LOG_FILE="$TEMP_DIR/securesphere-install.log"
+        LOG_FILE="$TEMP_DIR/closedpaw-install.log"
         exec 1> >(tee -a "$LOG_FILE")
         exec 2>&1
     fi
@@ -616,7 +616,7 @@ clone_repository() {
         rm -rf "$INSTALL_DIR"
     fi
     
-    git clone https://github.com/logansin/closedpaw.git "$INSTALL_DIR"
+    git clone https://github.com/closedpaw/closedpaw.git "$INSTALL_DIR"
     
     print_success "ClosedPaw downloaded"
 }

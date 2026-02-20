@@ -12,7 +12,7 @@
 
 ClosedPaw is a privacy-focused AI assistant that runs entirely on your local machine. Unlike cloud-based solutions, your data never leaves your device. Built with security-first architecture using gVisor/Kata Containers for true isolation.
 
-**📚 [Documentation & Wiki](https://github.com/logansin/closedpaw/tree/main/.qoder/repowiki/en/content)** — Comprehensive guides, API reference, and security deep-dives.
+**📚 [Documentation & Wiki](https://github.com/closedpaw/closedpaw/tree/main/.qoder/repowiki/en/content)** — Comprehensive guides, API reference, and security deep-dives.
 
 ## 🚀 Quick Start
 
@@ -35,21 +35,21 @@ npm install -g closedpaw
 
 **Linux / macOS (Recommended):**
 ```bash
-curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1 | iex
 ```
 
 ### Manual Installation
 
 ```bash
 # Clone repository
-git clone https://github.com/logansin/closedpaw.git
+git clone https://github.com/closedpaw/closedpaw.git
 cd closedpaw
-
+```
 # Install backend
 cd backend
 python -m venv venv
@@ -183,13 +183,13 @@ Pre-built Docker image available on GitHub Container Registry:
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/logansin/closedpaw:latest
+docker pull ghcr.io/closedpaw/closedpaw:latest
 
 # Run with Ollama access
 docker run -d \
   -p 3000:3000 -p 8000:8000 \
   -e OLLAMA_HOST=host.docker.internal:11434 \
-  ghcr.io/logansin/closedpaw:latest
+  ghcr.io/closedpaw/closedpaw:latest
 ```
 
 Available tags:
@@ -197,7 +197,7 @@ Available tags:
 - `main` - Latest build from main branch
 - Specific version tags (e.g., `1.1.1`)
 
-📦 [View package on GitHub](https://github.com/logansin/closedpaw/pkgs/container/closedpaw)
+📦 [View package on GitHub](https://github.com/closedpaw/closedpaw/pkgs/container/closedpaw)
 
 ## 🛠️ Technology Stack
 

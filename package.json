@@ -18,12 +18,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/logansin/closedpaw.git"
+    "url": "git+https://github.com/closedpaw/closedpaw.git"
   },
   "bugs": {
-    "url": "https://github.com/logansin/closedpaw/issues"
+    "url": "https://github.com/closedpaw/closedpaw/issues"
   },
-  "homepage": "https://github.com/logansin/closedpaw#readme",
+  "homepage": "https://github.com/closedpaw/closedpaw#readme",
   "bin": {
     "closedpaw": "./bin/closedpaw.js"
   },

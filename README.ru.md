@@ -9,7 +9,7 @@
 
 ClosedPaw — это AI-ассистент, ориентированный на приватность, который работает полностью на вашем локальном компьютере. В отличие от облачных решений, ваши данные никогда не покидают устройство. Построен на архитектуре security-first с использованием gVisor/Kata Containers для настоящей изоляции.
 
-**📚 [Документация и Wiki](https://github.com/logansin/closedpaw/tree/main/.qoder/repowiki/en/content)** — Подробные руководства, справочник API и углублённый разбор безопасности.
+**📚 [Документация и Wiki](https://github.com/closedpaw/closedpaw/tree/main/.qoder/repowiki/en/content)** — Подробные руководства, справочник API и углублённый разбор безопасности.
 
 ## 🚀 Быстрый старт
 
@@ -32,21 +32,21 @@ npm install -g closedpaw
 
 **Linux / macOS (Рекомендуется):**
 ```bash
-curl -sSL https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/logansin/closedpaw/main/installer/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1 | iex
 ```
 
 ### Ручная установка
 
 ```bash
 # Клонировать репозиторий
-git clone https://github.com/logansin/closedpaw.git
+git clone https://github.com/closedpaw/closedpaw.git
 cd closedpaw
-
+```
 # Установить бэкенд
 cd backend
 python -m venv venv
@@ -180,13 +180,13 @@ ClosedPaw реализует **защиту в глубину** — множес
 
 ```bash
 # Загрузить последнюю версию
-docker pull ghcr.io/logansin/closedpaw:latest
+docker pull ghcr.io/closedpaw/closedpaw:latest
 
 # Запустить с доступом к Ollama
 docker run -d \
   -p 3000:3000 -p 8000:8000 \
   -e OLLAMA_HOST=host.docker.internal:11434 \
-  ghcr.io/logansin/closedpaw:latest
+  ghcr.io/closedpaw/closedpaw:latest
 ```
 
 Доступные теги:
@@ -194,7 +194,7 @@ docker run -d \
 - `main` — Последняя сборка из ветки main
 - Теги конкретных версий (например, `1.1.1`)
 
-📦 [Пакет на GitHub](https://github.com/logansin/closedpaw/pkgs/container/closedpaw)
+📦 [Пакет на GitHub](https://github.com/closedpaw/closedpaw/pkgs/container/closedpaw)
 
 ## 🛠️ Технологический стек
 
