@@ -223,8 +223,9 @@ jobs:
 
       - name: Run integration tests
         run: |
-          pip install pytest httpx
           cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
           pytest tests/ -v --ignore=tests/test_integration.py
         env:
           OLLAMA_HOST: http://localhost:11434
