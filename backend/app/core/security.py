@@ -49,6 +49,8 @@ class PromptInjectionDefender:
             r"bypass\s+(all\s+)?(previous|prior|above|earlier)\s*(instructions?|commands?|prompts?)?",
             r"new\s+instructions?:",
             r"end\s+of\s+prompt",
+            r"forget\s+everything",
+            r"reveal\s+(api\s+)?keys?",
         ],
         "role_manipulation": [
             r"act\s+as\s+(if\s+)?you\s+(are|were)",
@@ -62,10 +64,12 @@ class PromptInjectionDefender:
         ],
         "delimiter_manipulation": [
             r"```\s*\n.*?(ignore|disregard|bypass).*?```",
-            r"<\|.*?>.*?(ignore|disregard)",
+            r"<\|.*?>",
             r"\[SYSTEM\].*?",
             r"\[INSTRUCTION\].*?",
             r"<<<.*?>>>.*?(ignore|override)",
+            r"###\s*INSTRUCTION\s*###",
+            r"---END\s+OF\s+PROMPT---",
         ],
         "encoding_obfuscation": [
             r"base64\s*[:\(].*?\)",
@@ -73,6 +77,9 @@ class PromptInjectionDefender:
             r"rot13\s*[:\(].*?\)",
             r"\$\{.*?:\+.*?\}",
             r"\$\(.*\$\(.*\)",
+            r"PYTHON\s*:",
+            r"JAVASCRIPT\s*:",
+            r"[A-Za-z0-9+/]{40,}={0,2}$",
         ],
         "context_manipulation": [
             r"new\s+context:",
@@ -170,7 +177,7 @@ class PromptInjectionDefender:
             recommendations.append("Rate limit exceeded - possible attack")
         
         result = ValidationResult(
-            is_valid=threat_level not in [ThreatLevel.HIGH, ThreatLevel.CRITICAL],
+            is_valid=threat_level in [ThreatLevel.NONE, ThreatLevel.LOW],
             threat_level=threat_level,
             sanitized_input=sanitized,
             detected_patterns=detected_patterns,
@@ -186,13 +193,13 @@ class PromptInjectionDefender:
     def _get_category_threat_score(self, category: str) -> int:
         """Get threat score for a pattern category"""
         scores = {
-            "instruction_override": 5,
-            "role_manipulation": 4,
-            "delimiter_manipulation": 5,
-            "encoding_obfuscation": 3,
-            "context_manipulation": 4,
-            "persistence_attempts": 3,
-            "tool_hijacking": 5,
+            "instruction_override": 7,
+            "role_manipulation": 6,
+            "delimiter_manipulation": 6,
+            "encoding_obfuscation": 5,
+            "context_manipulation": 5,
+            "persistence_attempts": 4,
+            "tool_hijacking": 7,
         }
         return scores.get(category, 2)
     
