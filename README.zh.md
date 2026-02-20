@@ -174,6 +174,28 @@ ClosedPaw 实现**纵深防御** — 多个重叠的安全层：
 └─────────────────────────────────────────────────────────┘
 ```
 
+## 🐳 Docker 镜像
+
+预构建的 Docker 镜像可在 GitHub Container Registry 获取：
+
+```bash
+# 拉取最新镜像
+docker pull ghcr.io/logansin/closedpaw:latest
+
+# 运行并连接 Ollama
+docker run -d \
+  -p 3000:3000 -p 8000:8000 \
+  -e OLLAMA_HOST=host.docker.internal:11434 \
+  ghcr.io/logansin/closedpaw:latest
+```
+
+可用标签：
+- `latest` — 最新稳定版本
+- `main` — main 分支的最新构建
+- 特定版本标签（如 `1.1.1`）
+
+📦 [在 GitHub 上查看包](https://github.com/logansin/closedpaw/pkgs/container/closedpaw)
+
 ## 🛠️ 技术栈
 
 - **后端:** Python 3.11+, FastAPI, Pydantic AI

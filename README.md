@@ -177,6 +177,28 @@ Package Size Breakdown:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## 🐳 Docker Image
+
+Pre-built Docker image available on GitHub Container Registry:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/logansin/closedpaw:latest
+
+# Run with Ollama access
+docker run -d \
+  -p 3000:3000 -p 8000:8000 \
+  -e OLLAMA_HOST=host.docker.internal:11434 \
+  ghcr.io/logansin/closedpaw:latest
+```
+
+Available tags:
+- `latest` - Latest stable release
+- `main` - Latest build from main branch
+- Specific version tags (e.g., `1.1.1`)
+
+📦 [View package on GitHub](https://github.com/logansin/closedpaw/pkgs/container/closedpaw)
+
 ## 🛠️ Technology Stack
 
 - **Backend:** Python 3.11+, FastAPI, Pydantic AI
