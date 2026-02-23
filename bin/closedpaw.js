@@ -708,11 +708,86 @@ program
   .description('Run system diagnostics')
   .action(runDoctor);
 
+// Check for updates (used by update command and auto-updater)
+async function checkForUpdates() {
+  const https = require('https');
+  
+  return new Promise((resolve) => {
+    const req = https.get('https://registry.npmjs.org/closedpaw/latest', (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const packageInfo = JSON.parse(data);
+          const latestVersion = packageInfo.version;
+          const currentVersion = '1.1.1'; // Should match package.json
+          
+          resolve({
+            current: currentVersion,
+            latest: latestVersion,
+            hasUpdate: latestVersion !== currentVersion,
+            releaseUrl: `https://github.com/closedpaw/closedpaw/releases/tag/v${latestVersion}`
+          });
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    
+    req.on('error', () => resolve(null));
+    req.setTimeout(5000, () => {
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
 program
   .command('update')
   .description('Update ClosedPaw to latest version')
   .option('-f, --force', 'Force update even if already on latest version')
+  .option('-d, --dry-run', 'Preview update actions without making changes')
   .action(async (options) => {
+    // Check for updates first
+    const updateInfo = await checkForUpdates();
+    
+    if (options.dryRun) {
+      console.log(boxen(
+        chalk.cyan.bold('🔒 ClosedPaw Update Preview') + '\n' +
+        chalk.gray('Showing what would be updated...'),
+        { padding: 1, borderStyle: 'round', borderColor: 'cyan' }
+      ));
+      
+      if (updateInfo) {
+        console.log(chalk.white('Current version: ') + chalk.yellow(updateInfo.current));
+        console.log(chalk.white('Latest version:  ') + chalk.green(updateInfo.latest));
+        console.log(chalk.white('Update needed:   ') + (updateInfo.hasUpdate ? chalk.green('Yes') : chalk.gray('No')));
+        console.log(chalk.white('Release notes:   ') + chalk.blue(updateInfo.releaseUrl));
+      }
+      
+      console.log('\n' + chalk.yellow('Actions that would be performed:'));
+      console.log('  • Update closedpaw npm package to latest version');
+      if (fs.existsSync(path.join(INSTALL_DIR, '.git'))) {
+        console.log('  • Pull latest changes from git repository');
+        console.log('  • Update Python dependencies in virtual environment');
+        console.log('  • Update frontend npm dependencies');
+      }
+      console.log('  • Check Ollama installation status');
+      console.log('\n' + chalk.green('No changes were made (dry-run mode).'));
+      return;
+    }
+    
+    // Show update info if available
+    if (updateInfo && updateInfo.hasUpdate && !options.force) {
+      console.log(boxen(
+        chalk.cyan.bold('🔒 Update Available') + '\n\n' +
+        chalk.white('Current: ') + chalk.yellow(updateInfo.current) + '\n' +
+        chalk.white('Latest:  ') + chalk.green(updateInfo.latest) + '\n\n' +
+        chalk.gray('Release notes: ') + chalk.blue(updateInfo.releaseUrl),
+        { padding: 1, borderStyle: 'round', borderColor: 'cyan' }
+      ));
+    }
+
     console.log(boxen(
       chalk.cyan.bold('🔒 ClosedPaw Updater') + '\n' +
       chalk.gray('Updating to the latest version...'),
