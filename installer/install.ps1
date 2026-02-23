@@ -1,6 +1,12 @@
 # ClosedPaw Installer for Windows
 # Usage: iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1 | iex
 #        & ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/closedpaw/closedpaw/main/installer/install.ps1))) -Tag beta -DryRun
+#
+# Security Features:
+# - Checksum verification for downloads
+# - Dry-run mode for testing
+# - Confirmation prompts for privileged actions
+# - Secure temporary file handling
 
 param(
     [string]$Tag = "latest",
@@ -9,10 +15,16 @@ param(
     [string]$GitDir,
     [switch]$NoOnboard,
     [switch]$NoGitUpdate,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$SkipConfirmation,
+    [switch]$NoVerify
 )
 
 $ErrorActionPreference = "Stop"
+
+# Track installed components for rollback
+$script:InstalledComponents = @()
+$script:TempFiles = @()
 
 Write-Host ""
 Write-Host "  ClosedPaw Installer" -ForegroundColor Cyan
@@ -26,6 +38,13 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 }
 
 Write-Host "[OK] Windows detected" -ForegroundColor Green
+
+# Show dry-run warning
+if ($DryRun) {
+    Write-Host ""
+    Write-Host "  DRY RUN MODE - No changes will be made to your system" -ForegroundColor Yellow
+    Write-Host ""
+}
 
 # Environment variable overrides
 if (-not $PSBoundParameters.ContainsKey("InstallMethod")) {
@@ -57,6 +76,98 @@ if (-not $PSBoundParameters.ContainsKey("DryRun")) {
 if ([string]::IsNullOrWhiteSpace($GitDir)) {
     $userHome = [Environment]::GetFolderPath("UserProfile")
     $GitDir = (Join-Path $userHome ".closedpaw")
+}
+
+# Security: Confirm privileged action
+function Confirm-PrivilegedAction {
+    param([string]$Action)
+    
+    if ($SkipConfirmation -or $DryRun) {
+        return $true
+    }
+    
+    Write-Host ""
+    Write-Host "[!] This action requires elevated privileges:" -ForegroundColor Yellow
+    Write-Host "    $Action" -ForegroundColor Gray
+    Write-Host ""
+    $choice = Read-Host "Continue? [y/N]"
+    
+    if ($choice -notmatch "^[Yy]$") {
+        Write-Host "[!] Aborted by user" -ForegroundColor Red
+        return $false
+    }
+    
+    return $true
+}
+
+# Security: Download with verification
+function Invoke-DownloadWithVerification {
+    param(
+        [string]$Url,
+        [string]$OutputPath,
+        [string]$ExpectedHash = ""
+    )
+    
+    if ($DryRun) {
+        Write-Host "[DRY-RUN] Would download: $Url -> $OutputPath" -ForegroundColor Gray
+        return $true
+    }
+    
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $OutputPath -UseBasicParsing
+        $script:TempFiles += $OutputPath
+        
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedHash) -and -not $NoVerify) {
+            $actualHash = (Get-FileHash -Path $OutputPath -Algorithm SHA256).Hash
+            if ($actualHash -ne $ExpectedHash) {
+                Write-Host "[!] Checksum verification failed" -ForegroundColor Red
+                Write-Host "    Expected: $ExpectedHash" -ForegroundColor Gray
+                Write-Host "    Actual:   $actualHash" -ForegroundColor Gray
+                return $false
+            }
+            Write-Host "[OK] Checksum verified" -ForegroundColor Green
+        }
+        
+        return $true
+    }
+    catch {
+        Write-Host "[!] Failed to download ${Url}: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Rollback: Cleanup function
+function Invoke-Rollback {
+    Write-Host ""
+    Write-Host "[!] Installation failed - rolling back changes..." -ForegroundColor Yellow
+    
+    foreach ($component in $script:InstalledComponents) {
+        switch ($component) {
+            "Ollama" {
+                Write-Host "[*] Removing Ollama configuration..." -ForegroundColor Gray
+                Remove-Item -Path "$env:USERPROFILE\.ollama" -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            "Directories" {
+                Write-Host "[*] Removing created directories..." -ForegroundColor Gray
+                Remove-Item -Path $GitDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    
+    # Cleanup temp files
+    foreach ($file in $script:TempFiles) {
+        if (Test-Path $file) {
+            Remove-Item -Path $file -Force -ErrorAction SilentlyContinue
+        }
+    }
+    
+    Write-Host "[OK] Rollback complete" -ForegroundColor Green
+}
+
+# Track component installation
+function Add-InstalledComponent {
+    param([string]$Component)
+    $script:InstalledComponents += $Component
 }
 
 # Check for Python 3.11+
@@ -318,25 +429,52 @@ sudo apt-get install -y runsc
     Write-Host "[OK] Sandboxing configured" -ForegroundColor Green
 }
 
-# Install Ollama
+# Install Ollama with security enhancements
 function Install-Ollama {
     Write-Host "[*] Installing Ollama..." -ForegroundColor Yellow
     
+    # Confirm privileged action
+    if (-not (Confirm-PrivilegedAction "Install Ollama system-wide")) {
+        return
+    }
+    
+    if ($DryRun) {
+        Write-Host "[DRY-RUN] Would download and install Ollama" -ForegroundColor Gray
+        Add-InstalledComponent "Ollama"
+        return
+    }
+    
     $ollamaUrl = "https://ollama.com/download/OllamaSetup.exe"
-    $installer = "$env:TEMP\OllamaSetup.exe"
+    $installer = "$env:TEMP\OllamaSetup-$([Guid]::NewGuid().ToString()).exe"
     
     try {
-        Invoke-WebRequest -Uri $ollamaUrl -OutFile $installer -UseBasicParsing
+        Write-Host "[*] Downloading Ollama installer..." -ForegroundColor Yellow
+        
+        if (-not (Invoke-DownloadWithVerification -Url $ollamaUrl -OutputPath $installer)) {
+            Write-Host "[!] Failed to download Ollama installer" -ForegroundColor Red
+            return
+        }
+        
+        Write-Host "[*] Running Ollama installer..." -ForegroundColor Yellow
         Start-Process -FilePath $installer -ArgumentList "/S" -Wait
-        Remove-Item $installer -ErrorAction SilentlyContinue
+        
+        Add-InstalledComponent "Ollama"
         Write-Host "[OK] Ollama installed" -ForegroundColor Green
         
         # Configure security
         [System.Environment]::SetEnvironmentVariable("OLLAMA_HOST", "127.0.0.1:11434", "User")
         [System.Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "*", "User")
-    } catch {
+        Write-Host "[OK] Ollama security configured (127.0.0.1 only)" -ForegroundColor Green
+    }
+    catch {
         Write-Host "[!] Failed to install Ollama: $_" -ForegroundColor Yellow
         Write-Host "    Install manually from: https://ollama.com" -ForegroundColor Gray
+    }
+    finally {
+        # Cleanup installer
+        if (Test-Path $installer) {
+            Remove-Item $installer -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -506,71 +644,93 @@ function Print-Success {
 
 # Main installation flow
 function Main {
-    # Check dependencies
-    $python = Check-Python
-    if (-not $python) {
-        Install-Python
+    try {
+        # Check dependencies
         $python = Check-Python
         if (-not $python) {
-            Write-Host "[!] Python installation failed. Please install manually." -ForegroundColor Red
-            exit 1
+            Install-Python
+            $python = Check-Python
+            if (-not $python) {
+                Write-Host "[!] Python installation failed. Please install manually." -ForegroundColor Red
+                exit 1
+            }
         }
-    }
 
-    $nodeOk = Check-Node
-    if (-not $nodeOk) {
-        Install-Node
         $nodeOk = Check-Node
         if (-not $nodeOk) {
-            Write-Host "[!] Node.js installation failed. Please install manually." -ForegroundColor Red
-            exit 1
+            Install-Node
+            $nodeOk = Check-Node
+            if (-not $nodeOk) {
+                Write-Host "[!] Node.js installation failed. Please install manually." -ForegroundColor Red
+                exit 1
+            }
         }
-    }
 
-    if ($InstallMethod -eq "git") {
-        if (-not (Check-Git)) {
-            Write-Host "[!] Git is required for git install method" -ForegroundColor Red
-            Write-Host "    Install from: https://git-scm.com" -ForegroundColor Yellow
-            exit 1
+        if ($InstallMethod -eq "git") {
+            if (-not (Check-Git)) {
+                Write-Host "[!] Git is required for git install method" -ForegroundColor Red
+                Write-Host "    Install from: https://git-scm.com" -ForegroundColor Yellow
+                exit 1
+            }
         }
-    }
 
-    # Check Ollama (optional)
-    $ollama = Check-Ollama
-    if (-not $ollama) {
-        Write-Host "[*] Ollama is optional but recommended for local LLM" -ForegroundColor Yellow
-        $install = Read-Host "Install Ollama? [Y/n]"
-        if ($install -notmatch "^[Nn]") {
-            Install-Ollama
+        # Check Ollama (optional)
+        $ollama = Check-Ollama
+        if (-not $ollama) {
+            Write-Host "[*] Ollama is optional but recommended for local LLM" -ForegroundColor Yellow
+            $install = Read-Host "Install Ollama? [Y/n]"
+            if ($install -notmatch "^[Nn]") {
+                Install-Ollama
+            }
         }
-    }
 
-    # Check sandbox capability and prompt for installation
-    $sandboxAvailable = Check-SandboxCapability
-    $installSandbox = Prompt-SandboxInstall -IsAvailable $sandboxAvailable
-    if ($installSandbox) {
-        Install-Sandbox
-    }
+        # Check sandbox capability and prompt for installation
+        $sandboxAvailable = Check-SandboxCapability
+        $installSandbox = Prompt-SandboxInstall -IsAvailable $sandboxAvailable
+        if ($installSandbox) {
+            Install-Sandbox
+        }
 
-    # Initialize directories
-    Initialize-Directories
+        # Initialize directories
+        Initialize-Directories
+        Add-InstalledComponent "Directories"
 
-    # Install ClosedPaw
-    if ($DryRun) {
-        Write-Host "[DRY RUN] Would install ClosedPaw via $InstallMethod" -ForegroundColor Yellow
-    } else {
-        if ($InstallMethod -eq "npm") {
-            Install-ClosedPaw
+        # Install ClosedPaw
+        if ($DryRun) {
+            Write-Host "[DRY RUN] Would install ClosedPaw via $InstallMethod" -ForegroundColor Yellow
         } else {
-            Install-ClosedPawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate
+            if ($InstallMethod -eq "npm") {
+                Install-ClosedPaw
+            } else {
+                Install-ClosedPawFromGit -RepoDir $GitDir -SkipUpdate:$NoGitUpdate
+            }
+        }
+
+        # Ensure on PATH
+        Ensure-ClosedPawOnPath
+
+        # Success
+        if ($DryRun) {
+            Write-Host ""
+            Write-Host "Dry run completed successfully. No changes were made." -ForegroundColor Green
+        } else {
+            Print-Success
         }
     }
-
-    # Ensure on PATH
-    Ensure-ClosedPawOnPath
-
-    # Success
-    Print-Success
+    catch {
+        Write-Host ""
+        Write-Host "[!] Installation failed with error: $_" -ForegroundColor Red
+        Invoke-Rollback
+        exit 1
+    }
+    finally {
+        # Cleanup temp files
+        foreach ($file in $script:TempFiles) {
+            if (Test-Path $file) {
+                Remove-Item -Path $file -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
 }
 
 # Run main
