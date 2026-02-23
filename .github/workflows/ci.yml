@@ -217,9 +217,10 @@ jobs:
         if: matrix.test-type == 'npm'
         run: |
           # Setup Python first (required by postinstall)
+          # Ubuntu 24.04 has Python 3.12 by default, install 3.11
           sudo apt-get update
-          sudo apt-get install -y python3.11 python3.11-venv
-          python3.11 -m ensurepip --upgrade || true
+          sudo apt-get install -y python3.11 python3.11-venv || sudo apt-get install -y python3 python3-venv
+          python3 --version
           # Pack and install locally (skip postinstall for test)
           npm pack
           npm install -g ./closedpaw-*.tgz --ignore-scripts

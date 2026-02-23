@@ -2,13 +2,14 @@
 # Python 3.11+ required
 
 # Web Framework
-fastapi==0.115.0
+fastapi==0.115.8
 uvicorn[standard]==0.40.0
 python-multipart==0.0.17
 
 # Data Validation
 pydantic>=2.10
-pydantic-ai==1.56.0
+# pydantic-ai 0.0.15 - safe from CVE-2026-25580 (affects 0.0.26+)
+pydantic-ai==0.0.15
 
 # HTTP Client (for multi-provider support)
 httpx[http2]>=0.27.2
