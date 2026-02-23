@@ -200,6 +200,108 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ============================================
+  # Installation Testing
+  # ============================================
+  install-test:
+    name: Test Installation Scripts
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [npm, docker, shell]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test NPM Global Install
+        if: matrix.test-type == 'npm'
+        run: |
+          # Pack and install locally
+          npm pack
+          npm install -g ./closedpaw-*.tgz
+          # Verify installation
+          which closedpaw
+          closedpaw --version
+          closedpaw --help
+
+      - name: Test Docker Installation
+        if: matrix.test-type == 'docker'
+        run: |
+          # Build Docker image
+          docker build -t closedpaw:test .
+          # Verify image exists
+          docker images | grep closedpaw
+          # Test container startup (without Ollama)
+          docker run --rm closedpaw:test python --version
+          docker run --rm closedpaw:test node --version
+
+      - name: Test Shell Installer
+        if: matrix.test-type == 'shell'
+        run: |
+          # Make installer executable
+          chmod +x installer/install.sh
+          # Test in dry-run mode
+          cd /tmp
+          bash $GITHUB_WORKSPACE/installer/install.sh --dry-run --yes || true
+          # Verify script syntax
+          bash -n $GITHUB_WORKSPACE/installer/install.sh
+
+  # ============================================
+  # Multi-OS Installation Test
+  # ============================================
+  install-test-multi-os:
+    name: Test Install on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git
+
+      - name: Test Prerequisites Installation
+        run: |
+          # Test Python 3.11 installation
+          if ! command -v python3.11 &> /dev/null; then
+            sudo apt-get install -y software-properties-common
+            sudo add-apt-repository -y ppa:deadsnakes/ppa
+            sudo apt-get update
+            sudo apt-get install -y python3.11 python3.11-venv python3.11-pip
+          fi
+          python3.11 --version
+
+      - name: Test Node.js 20 Installation
+        run: |
+          if ! command -v node &> /dev/null || [[ $(node --version) != v20* ]]; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          fi
+          node --version
+          npm --version
+
+      - name: Test Backend Dependencies
+        run: |
+          cd backend
+          python3.11 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          # Verify key packages
+          pip show fastapi pydantic cryptography
+
+      - name: Test Frontend Dependencies
+        run: |
+          cd frontend
+          npm install --legacy-peer-deps
+          npm run build
+
+  # ============================================
   # Integration Tests
   # ============================================
   integration-test:
